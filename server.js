@@ -98,7 +98,14 @@ let nextColorIndex = 0;
 // --- FÍSICA Y SPAWN DE DRONES EN EL SERVIDOR ---
 
 function spawnDrone() {
-    if (!gameState.active || gameState.drones.length >= 3) return;
+    // --- PARÁMETROS CONFIGURABLES ---
+    const BASE_MAX_DRONES = 2; // Cantidad de naves en oleada 1
+    const MAX_DRONES_LIMIT = 5; // Límite absoluto en oleadas avanzadas
+    
+    // Escalar la cantidad de enemigos permitidos simultáneamente según el nivel de oleada
+    const currentMaxDrones = Math.min(MAX_DRONES_LIMIT, BASE_MAX_DRONES + Math.floor((gameState.wave - 1) / 2));
+    
+    if (!gameState.active || gameState.drones.length >= currentMaxDrones) return;
     
     const angle = Math.random() * Math.PI * 2;
     const distance = 250 + Math.random() * 350;
@@ -113,7 +120,9 @@ function spawnDrone() {
         z: 1800 + Math.random() * 200,
         type: types[Math.floor(Math.random() * types.length)],
         size: 35,
-        speed: 4.5 + (gameState.wave * 0.4) + Math.random()
+        // --- PARÁMETROS CONFIGURABLES ---
+        // Oleada 1 tendrá una velocidad de ~3.2m/frame. La dificultad escala un 15% por oleada.
+        speed: 2.8 + (gameState.wave * 0.35) + (Math.random() * 0.5)
     });
 }
 

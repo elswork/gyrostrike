@@ -454,10 +454,21 @@ function updateCameraFromSensors() {
     const yaw = Math.atan2(xs, zs);
     const pitch = Math.asin(ys);
     
-    // Sensibilidad del giroscopio (multiplicador para movimiento fluido y de rango completo)
-    const sensitivity = 2.0;
-    state.camYaw = -yaw * sensitivity; // Invertido para que girar el móvil a la derecha mire a la derecha
-    state.camPitch = pitch * sensitivity; // Apuntado intuitivo: subir móvil = mirar hacia arriba
+    // --- PARÁMETROS CONFIGURABLES ---
+    const SENSITIVITY = 2.0;   // Multiplicador de escala física
+    const INPUT_LERP = 0.16;   // Nivel de suavizado (0.01 = ultra suave/lento, 1.0 = instantáneo/brusco)
+    const DEADZONE = 0.01;     // Ángulo mínimo (en radianes) a ignorar para filtrar temblores
+
+    // Filtrar pequeñas variaciones estáticas
+    let targetYaw = -yaw * SENSITIVITY;
+    let targetPitch = pitch * SENSITIVITY;
+    
+    if (Math.abs(yaw) < DEADZONE) targetYaw = 0;
+    if (Math.abs(pitch) < DEADZONE) targetPitch = 0;
+
+    // Aplicar interpolación lineal (Lerp) para movimiento cinemático y suave
+    state.camYaw += (targetYaw - state.camYaw) * INPUT_LERP;
+    state.camPitch += (targetPitch - state.camPitch) * INPUT_LERP;
     
     // Limitar la inclinación vertical máxima para no voltear del todo la cámara
     state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch));
@@ -564,6 +575,11 @@ function getRelative3D(x, y, z) {
 // --- CICLO DE ACTUALIZACIÓN DEL JUEGO ---
 
 function update() {
+    // Reducir la sacudida de pantalla gradualmente
+    if (state.screenShake > 0) {
+        state.screenShake = Math.max(0, state.screenShake - 0.7);
+    }
+
     // 1. Enfriamiento del arma
     if (state.weaponHeat > 0) {
         state.weaponHeat = Math.max(0, state.weaponHeat - CONFIG.coolRate);
@@ -711,6 +727,18 @@ function drawDroneWireframe(ctx, type, radius) {
 }
 
 function draw() {
+    ctx.save();
+    
+    // --- PARÁMETROS CONFIGURABLES ---
+    const SHAKE_MULTIPLIER = 1.2; // Multiplicador de intensidad de la sacudida
+    
+    // Aplicar vibración visual al renderizado si hay screenShake activo
+    if (state.screenShake > 0) {
+        const dx = (Math.random() - 0.5) * state.screenShake * SHAKE_MULTIPLIER;
+        const dy = (Math.random() - 0.5) * state.screenShake * SHAKE_MULTIPLIER;
+        ctx.translate(dx, dy);
+    }
+
     // Actualizar diagnóstico de cámara (para modo táctil o giroscopio)
     const dbgCam = document.getElementById('dbg-cam');
     if (dbgCam) {
@@ -1013,6 +1041,7 @@ function draw() {
     ctx.fillText(`VELOCIDAD: ${Math.round(state.speed)} km/h`, 30, 116);
     ctx.fillText(`DISTANCIA: ${Math.round(planetDist)} m`, 30, 131);
     ctx.restore();
+    ctx.restore(); // Restaurar el ctx.save() inicial del screenShake
 }
 
 function drawSpatialGrid() {
@@ -1116,6 +1145,17 @@ function initGame() {
     state.weaponHeat = 0;
     state.overheated = false;
     state.sensorEventsCount = 0; // Resetear contador para verificar si llegan lecturas reales
+    state.screenShake = 0;       // Inicializar sacudida
+    
+    // --- PARÁMETROS CONFIGURABLES ---
+    const AUTO_CALIBRATE_DELAY = 600; // Tiempo en ms para calibrar después de iniciar
+
+    // Autocalibración automática retardada para favorecer una postura cómoda
+    setTimeout(() => {
+        if (state.playing) {
+            calibrateSensors();
+        }
+    }, AUTO_CALIBRATE_DELAY);
     
     // Resetear velocidad y acelerador visual a 0
     state.speed = 0;
@@ -1358,6 +1398,11 @@ function connectWebSocket() {
             else if (msg.type === 'hit') {
                 playExplosionSound();
                 
+                // Vibración corta táctil al derribar nave
+                if (navigator.vibrate) {
+                    navigator.vibrate(40);
+                }
+                
                 const pCount = 15;
                 const pData = state.otherPlayers.get(msg.playerId);
                 const color = (msg.playerId === state.myId) ? state.myColor : (pData ? pData.color : '#ff007f');
@@ -1388,7 +1433,17 @@ function connectWebSocket() {
             else if (msg.type === 'damage') {
                 state.shield = msg.shield;
                 state.armor = msg.armor;
+                
+                // Activar sacudida física de pantalla (game juice)
+                state.screenShake = 12;
+                
+                // Velo rojo de impacto
                 takeDamageEffects();
+                
+                // API Háptica móvil (Vibrar 120ms)
+                if (navigator.vibrate) {
+                    navigator.vibrate(120);
+                }
             }
             
             else if (msg.type === 'waveStart') {
