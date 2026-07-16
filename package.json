@@ -1,0 +1,14 @@
+{
+  "name": "gyrostrike-server",
+  "version": "1.0.0",
+  "description": "Multiplayer server for GyroStrike",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.13.0"
+  },
+  "author": "Antigravity",
+  "license": "MIT"
+}

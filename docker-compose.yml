@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  gyrostrike:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gyrostrike-game:latest
+    container_name: gyrostrike_app
+    restart: unless-stopped
+    ports:
+      - "8088:80" # Mapea el puerto 80 del contenedor al 8088 del host para pruebas

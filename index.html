@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>GyroStrike: Neon Sector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Meta etiquetas para App en Pantalla Completa (PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+    <!-- Pantalla de Inicio / Permisos / Calibración -->
+    <div id="overlay" class="overlay active">
+        <div class="glass-card">
+            <h1 class="glow-text">GYRO<span>STRIKE</span></h1>
+            <p class="subtitle">NEON SECTOR</p>
+            
+            <div class="instructions">
+                <p>Usa tu teléfono como un arma espacial. Gira sobre ti mismo para apuntar a los drones invasores y toca la pantalla para disparar.</p>
+                <div class="connection-tip">
+                    <span class="pulse-icon">📡</span>
+                    <span id="ip-text">Abre esta web desde tu móvil usando tu IP local</span>
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="action-buttons">
+                <button id="btn-start" class="btn primary">INICIAR COMBATE</button>
+                <button id="btn-calibrate" class="btn secondary hidden">RECALIBRAR</button>
+            </div>
+            
+            <div id="status-message" class="status-msg">
+                Detectando sensores...
+            </div>
+            
+            <div id="sensor-fallback-info" class="fallback-info hidden">
+                ⚠️ Giroscopio no disponible. Se activará el modo táctil (arrastra para apuntar).
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD de Juego -->
+    <div id="hud" class="hud hidden">
+        <!-- Barra Superior -->
+        <div class="hud-top">
+            <div class="hud-item score-container">
+                <span class="label">SCORE</span>
+                <span id="score-val" class="value glow-cyan">00000</span>
+            </div>
+            <div class="hud-item wave-container">
+                <span class="label">WAVE</span>
+                <span id="wave-val" class="value glow-orange">1</span>
+            </div>
+            <div class="hud-item multiplier-container">
+                <span id="mult-val" class="value">x1</span>
+            </div>
+        </div>
+
+        <!-- Barra Inferior -->
+        <div class="hud-bottom">
+            <!-- Escudo y Vida -->
+            <div class="hud-bar-group">
+                <div class="hud-bar-container">
+                    <span class="label">SHIELD</span>
+                    <div class="bar-bg">
+                        <div id="shield-bar" class="bar-fill shield-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+                <div class="hud-bar-container">
+                    <span class="label">ARMOR</span>
+                    <div class="bar-bg">
+                        <div id="armor-bar" class="bar-fill armor-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Temperatura del Arma -->
+            <div class="hud-bar-group right-align">
+                <div class="hud-bar-container heat-container">
+                    <span class="label">WEAPON HEAT</span>
+                    <div class="bar-bg">
+                        <div id="heat-bar" class="bar-fill heat-fill" style="width: 0%;"></div>
+                    </div>
+                    <span id="overheat-warning" class="overheat-text hidden">OVERHEAT</span>
+                </div>
+                <!-- Botón de calibración rápida en juego -->
+                <button id="btn-game-calibrate" class="btn-icon">🎯</button>
+            </div>
+        </div>
+
+        <!-- Alertas del Centro (Oleada, Overheat, Daño) -->
+        <div id="game-alert" class="game-alert hidden">NUEVA OLEADA</div>
+    </div>
+
+    <!-- Panel de Diagnóstico de Sensores (Cyberpunk Style) -->
+    <div id="sensor-debug" class="sensor-debug-panel">
+        <div>SYSTEM DIAGNOSTICS:</div>
+        <div>GYRO API: <span id="dbg-api">DETECTANDO...</span></div>
+        <div>EVENTS: <span id="dbg-events">0</span></div>
+        <div>ALPHA: <span id="dbg-alpha">-</span></div>
+        <div>BETA: <span id="dbg-beta">-</span></div>
+        <div>GAMMA: <span id="dbg-gamma">-</span></div>
+        <div>CAM Y/P: <span id="dbg-cam">-</span></div>
+    </div>
+
+    <!-- Lienzo de Dibujo -->
+    <canvas id="gameCanvas"></canvas>
+
+    <script src="app.js"></script>
+</body>
+</html>
