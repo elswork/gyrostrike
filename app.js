@@ -445,7 +445,7 @@ function updateCameraFromSensors() {
     // Sensibilidad del giroscopio (multiplicador para movimiento fluido y de rango completo)
     const sensitivity = 2.0;
     state.camYaw = yaw * sensitivity;
-    state.camPitch = pitch * sensitivity;
+    state.camPitch = -pitch * sensitivity; // Invertido para apuntado intuitivo (subir móvil = mirar hacia arriba)
     
     // Limitar la inclinación vertical máxima para no voltear del todo la cámara
     state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch));

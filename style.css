@@ -541,4 +541,29 @@ html, body {
     transform: scale(1.1) rotate(5deg);
 }
 
+/* Soporte para pantallas móviles pequeñas en modo retrato */
+@media (max-width: 480px) {
+    .glass-card {
+        padding: 25px 20px;
+    }
+    .glow-text {
+        font-size: 1.8rem;
+        letter-spacing: 2px;
+    }
+    .subtitle {
+        font-size: 0.75rem;
+        letter-spacing: 4px;
+        margin-bottom: 20px;
+    }
+    .instructions {
+        font-size: 0.85rem;
+        margin-bottom: 15px;
+    }
+    .repo-link-container {
+        margin-top: 20px;
+        padding-top: 15px;
+    }
+}
+
+
 
