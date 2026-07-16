@@ -167,7 +167,7 @@ function serverPhysicsLoop() {
     
     // Calcular el vector de avance en 3D
     const dx = gameState.speed * Math.sin(avgYaw) * Math.cos(avgPitch) * 0.033;
-    const dy = -gameState.speed * Math.sin(avgPitch) * 0.033;
+    const dy = gameState.speed * Math.sin(avgPitch) * 0.033;
     const dz = gameState.speed * Math.cos(avgYaw) * Math.cos(avgPitch) * 0.033;
     
     // Actualizar posición del planeta objetivo (se desplaza al revés que el avance)

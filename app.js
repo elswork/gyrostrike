@@ -457,7 +457,7 @@ function updateCameraFromSensors() {
     // Sensibilidad del giroscopio (multiplicador para movimiento fluido y de rango completo)
     const sensitivity = 2.0;
     state.camYaw = -yaw * sensitivity; // Invertido para que girar el móvil a la derecha mire a la derecha
-    state.camPitch = -pitch * sensitivity; // Invertido para apuntado intuitivo (subir móvil = mirar hacia arriba)
+    state.camPitch = pitch * sensitivity; // Apuntado intuitivo: subir móvil = mirar hacia arriba
     
     // Limitar la inclinación vertical máxima para no voltear del todo la cámara
     state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch));
@@ -956,7 +956,7 @@ function draw() {
     // 5.5 Dibujar Miras de otros Jugadores (Co-op Pointers)
     state.otherPlayers.forEach(player => {
         const x = Math.sin(player.yaw) * Math.cos(player.pitch) * 500;
-        const y = -Math.sin(player.pitch) * 500;
+        const y = Math.sin(player.pitch) * 500;
         const z = Math.cos(player.yaw) * Math.cos(player.pitch) * 500;
         
         const rel = getRelative3D(x, y, z);
@@ -1328,7 +1328,7 @@ function connectWebSocket() {
             else if (msg.type === 'shoot') {
                 if (msg.playerId !== state.myId) {
                     const x = Math.sin(msg.yaw) * Math.cos(msg.pitch) * 500;
-                    const y = -Math.sin(msg.pitch) * 500;
+                    const y = Math.sin(msg.pitch) * 500;
                     const z = Math.cos(msg.yaw) * Math.cos(msg.pitch) * 500;
                     
                     const rel = getRelative3D(x, y, z);
