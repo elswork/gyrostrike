@@ -1023,7 +1023,6 @@ function draw() {
     
     ctx.fillStyle = '#ffffff';
     ctx.font = '11px Orbitron';
-    const planetDist = Math.sqrt(state.planetX * state.planetX + state.planetY * state.planetY + state.planetZ * state.planetZ);
     ctx.fillText(`VELOCIDAD: ${Math.round(state.speed)} km/h`, 30, 116);
     ctx.fillText(`DISTANCIA: ${Math.round(planetDist)} m`, 30, 131);
     ctx.restore();
