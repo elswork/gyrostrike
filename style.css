@@ -565,5 +565,123 @@ html, body {
     }
 }
 
+/* Controles táctiles móviles en modo landscape */
+.mobile-controls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 50;
+    pointer-events: none; /* Dejar pasar eventos de interacción a las zonas específicas */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px;
+    box-sizing: border-box;
+}
+
+.mobile-controls.hidden {
+    display: none !important;
+}
+
+.control-zone {
+    pointer-events: auto; /* Habilitar interacción táctil */
+    background: rgba(6, 6, 20, 0.45);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Acelerador (izquierdo) */
+.left-zone {
+    width: 100px;
+    height: 220px;
+    padding: 15px 10px;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.05);
+}
+
+.slider-label {
+    font-family: var(--font-cyber);
+    font-size: 11px;
+    color: var(--neon-cyan);
+    margin-bottom: 12px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 5px var(--neon-cyan);
+}
+
+.slider-track {
+    width: 20px;
+    height: 140px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.slider-bar {
+    width: 100%;
+    height: 0%; /* Se actualiza con el acelerador */
+    background: linear-gradient(to top, var(--neon-cyan), var(--neon-green));
+    border-radius: 10px;
+    position: absolute;
+    bottom: 0;
+    transition: height 0.05s linear;
+}
+
+.slider-knob {
+    width: 34px;
+    height: 34px;
+    background: #fff;
+    border: 3px solid var(--neon-cyan);
+    border-radius: 50%;
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, 50%);
+    bottom: 0; /* Se actualiza de 0px a 140px con touch */
+    box-shadow: 0 0 15px var(--neon-cyan);
+    cursor: pointer;
+}
+
+/* Botón de Disparo (derecho) */
+.right-zone {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--neon-pink);
+    box-shadow: 0 0 25px rgba(255, 0, 127, 0.25);
+    background: radial-gradient(circle, rgba(255, 0, 127, 0.2) 0%, rgba(6, 6, 20, 0.8) 100%);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.right-zone:active {
+    transform: scale(0.92);
+    box-shadow: 0 0 35px var(--neon-pink);
+}
+
+.fire-btn-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.fire-label {
+    font-family: var(--font-cyber);
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px var(--neon-pink);
+}
+
+
 
 

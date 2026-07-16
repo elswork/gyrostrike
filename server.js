@@ -68,7 +68,7 @@ server.on('upgrade', (request, socket, head) => {
 
 // --- ESTADO DEL JUEGO COMPARTIDO ---
 const gameState = {
-    players: new Map(), // id -> { id, color, yaw, pitch, score, lastActive }
+    players: new Map(), // id -> { id, color, yaw, pitch, score, lastActive, throttle }
     drones: [],         // array de drones
     shield: 100,
     armor: 100,
@@ -76,8 +76,13 @@ const gameState = {
     killsInWave: 0,
     killsNeededForNextWave: 8,
     active: false,
-    droneIdCounter: 0
+    droneIdCounter: 0,
+    planetX: 0,
+    planetY: 0,
+    planetZ: 10000,
+    speed: 0
 };
+
 
 const COLORS = [
     '#00f0ff', // Cyan
@@ -139,11 +144,52 @@ function broadcast(message) {
 function serverPhysicsLoop() {
     if (!gameState.active) return;
     
+    // 1. Calcular promedio de yaw, pitch y throttle de todos los jugadores
+    let totalYaw = 0;
+    let totalPitch = 0;
+    let totalThrottle = 0;
+    let playerCount = 0;
+    
+    gameState.players.forEach(p => {
+        totalYaw += p.yaw || 0;
+        totalPitch += p.pitch || 0;
+        totalThrottle += p.throttle || 0;
+        playerCount++;
+    });
+    
+    const avgYaw = playerCount > 0 ? totalYaw / playerCount : 0;
+    const avgPitch = playerCount > 0 ? totalPitch / playerCount : 0;
+    const avgThrottle = playerCount > 0 ? totalThrottle / playerCount : 0;
+    
+    // Calcular velocidad de la nave (max velocidad = 180 m/s)
+    const maxSpeed = 180;
+    gameState.speed = avgThrottle * maxSpeed;
+    
+    // Calcular el vector de avance en 3D
+    const dx = gameState.speed * Math.sin(avgYaw) * Math.cos(avgPitch) * 0.033;
+    const dy = -gameState.speed * Math.sin(avgPitch) * 0.033;
+    const dz = gameState.speed * Math.cos(avgYaw) * Math.cos(avgPitch) * 0.033;
+    
+    // Actualizar posición del planeta objetivo (se desplaza al revés que el avance)
+    gameState.planetX -= dx;
+    gameState.planetY -= dy;
+    gameState.planetZ -= dz;
+    
+    // Si llegamos al planeta objetivo
+    if (gameState.planetZ <= 300) {
+        nextWave();
+        return;
+    }
+    
     let damaged = false;
     // Mover drones
     for (let i = gameState.drones.length - 1; i >= 0; i--) {
         const d = gameState.drones[i];
-        d.z -= d.speed;
+        
+        // El dron se mueve hacia el jugador + el efecto de la velocidad de la nave
+        d.x -= dx;
+        d.y -= dy;
+        d.z -= (d.speed + dz / 0.033) * 0.033;
         
         // Impacto contra la base de los jugadores
         if (d.z <= 20) {
@@ -179,7 +225,8 @@ function serverPhysicsLoop() {
         color: p.color,
         yaw: p.yaw,
         pitch: p.pitch,
-        score: p.score
+        score: p.score,
+        throttle: p.throttle
     }));
     
     broadcast({
@@ -188,7 +235,11 @@ function serverPhysicsLoop() {
         drones: gameState.drones,
         shield: gameState.shield,
         armor: gameState.armor,
-        wave: gameState.wave
+        wave: gameState.wave,
+        planetX: gameState.planetX,
+        planetY: gameState.planetY,
+        planetZ: gameState.planetZ,
+        speed: gameState.speed
     });
 }
 
@@ -204,10 +255,21 @@ function nextWave() {
     gameState.killsNeededForNextWave = 8 + gameState.wave * 3;
     gameState.shield = Math.min(100, gameState.shield + 25);
     
+    // Reiniciar planeta objetivo para la nueva fase
+    gameState.planetX = (Math.random() - 0.5) * 2000;
+    gameState.planetY = (Math.random() - 0.5) * 1000;
+    gameState.planetZ = 10000 + gameState.wave * 2000; // Más largo cada oleada
+    gameState.speed = 0;
+    // Resetear aceleración de los jugadores para que inicien parados la nueva fase
+    gameState.players.forEach(p => p.throttle = 0);
+    
     broadcast({
         type: 'waveStart',
         wave: gameState.wave,
-        shield: gameState.shield
+        shield: gameState.shield,
+        planetX: gameState.planetX,
+        planetY: gameState.planetY,
+        planetZ: gameState.planetZ
     });
 }
 
@@ -260,6 +322,7 @@ wss.on('connection', (ws) => {
         yaw: 0,
         pitch: 0,
         score: 0,
+        throttle: 0,
         lastActive: Date.now()
     };
     
@@ -273,6 +336,10 @@ wss.on('connection', (ws) => {
         gameState.wave = 1;
         gameState.killsInWave = 0;
         gameState.drones = [];
+        gameState.planetX = (Math.random() - 0.5) * 1500;
+        gameState.planetY = (Math.random() - 0.5) * 800;
+        gameState.planetZ = 10000;
+        gameState.speed = 0;
         spawnDrone();
     }
     
@@ -283,7 +350,10 @@ wss.on('connection', (ws) => {
         color: myColor,
         wave: gameState.wave,
         shield: gameState.shield,
-        armor: gameState.armor
+        armor: gameState.armor,
+        planetX: gameState.planetX,
+        planetY: gameState.planetY,
+        planetZ: gameState.planetZ
     }));
     
     ws.on('message', (messageStr) => {
@@ -294,6 +364,10 @@ wss.on('connection', (ws) => {
             if (msg.type === 'move') {
                 playerState.yaw = msg.yaw;
                 playerState.pitch = msg.pitch;
+            }
+            
+            else if (msg.type === 'throttle') {
+                playerState.throttle = msg.value;
             }
             
             else if (msg.type === 'shoot') {

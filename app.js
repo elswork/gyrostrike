@@ -26,6 +26,15 @@ const state = {
     drones: [],
     lasers: [],
     particles: [],
+    // Variables de Navegación y Planeta Objetivo
+    planetX: 0,
+    planetY: 0,
+    planetZ: 10000,
+    targetPlanetX: 0,
+    targetPlanetY: 0,
+    targetPlanetZ: 10000,
+    speed: 0,
+    gridOffset: 0,
     // Variables Multijugador
     ws: null,
     myId: null,
@@ -243,6 +252,7 @@ function resizeCanvas() {
     
     // Detectar si estamos en modo landscape
     state.screenRotated = window.innerWidth > window.innerHeight;
+    updateMobileControlsVisibility();
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -438,9 +448,24 @@ function updateCameraFromSensors() {
     const yr = -rRel23;
     const zr = -rRel33;
     
-    // Calcular yaw y pitch usando la proyección 3D del vector de dirección
-    const yaw = Math.atan2(xr, -zr);
-    const pitch = Math.asin(yr);
+    // Obtener la rotación actual de la pantalla para compensar el modo horizontal (landscape)
+    let screenAngle = 0;
+    if (window.screen && window.screen.orientation) {
+        screenAngle = (window.screen.orientation.angle || 0) * Math.PI / 180;
+    } else if (typeof window.orientation !== 'undefined') {
+        screenAngle = window.orientation * Math.PI / 180;
+    }
+    
+    // Rotar el vector en el plano XY según la rotación de la pantalla
+    const cosS = Math.cos(-screenAngle);
+    const sinS = Math.sin(-screenAngle);
+    const xs = xr * cosS - yr * sinS;
+    const ys = xr * sinS + yr * cosS;
+    const zs = zr;
+    
+    // Calcular yaw y pitch usando la proyección 3D del vector de dirección alineado a la pantalla
+    const yaw = Math.atan2(xs, -zs);
+    const pitch = Math.asin(ys);
     
     // Sensibilidad del giroscopio (multiplicador para movimiento fluido y de rango completo)
     const sensitivity = 2.0;
@@ -561,9 +586,10 @@ function update() {
         }
     }
     
-    // 2. Estrellas: moverlas levemente o simular vuelo hacia el frente
+    // 2. Estrellas: moverlas según la velocidad de la nave para dar sensación de aceleración/viaje
+    const starSpeed = 0.5 + (state.speed * 0.08);
     state.stars.forEach(star => {
-        star.z -= 0.5; // Ligera velocidad hacia adelante para dar sensación de viaje
+        star.z -= starSpeed;
         if (star.z <= 0) {
             star.z = 2000;
             star.x = (Math.random() - 0.5) * 2000;
@@ -583,6 +609,14 @@ function update() {
         }
         drone.rotation = (drone.rotation || 0) + 0.02;
     });
+    
+    // 3.5 Planeta Objetivo: interpolación suave de posición
+    if (state.targetPlanetX !== undefined) {
+        const lerpFactor = 0.18;
+        state.planetX += (state.targetPlanetX - state.planetX) * lerpFactor;
+        state.planetY += (state.targetPlanetY - state.planetY) * lerpFactor;
+        state.planetZ += (state.targetPlanetZ - state.planetZ) * lerpFactor;
+    }
     
     // 4. Lasers: reducir vida útil (bucle inverso)
     for (let i = state.lasers.length - 1; i >= 0; i--) {
@@ -783,6 +817,128 @@ function draw() {
         ctx.fillText(`${Math.round(rel.z)}m`, screenX, screenY + radius + 15);
     });
 
+    // 4.5 Dibujar Planeta Objetivo (si está en rango visual)
+    const pRel = getRelative3D(state.planetX, state.planetY, state.planetZ);
+    let planetOnScreen = false;
+    let pScreenX = 0, pScreenY = 0;
+    
+    if (pRel.z > 50) {
+        const pScale = CONFIG.fov / pRel.z;
+        pScreenX = canvas.width / 2 + pRel.x * pScale;
+        pScreenY = canvas.height / 2 + pRel.y * pScale;
+        
+        // El tamaño del planeta base es 450
+        const pRadius = (450 / pRel.z) * CONFIG.fov;
+        
+        if (pRadius > 2) {
+            ctx.save();
+            // Crear gradiente esférico para efecto 3D
+            const grad = ctx.createRadialGradient(
+                pScreenX - pRadius * 0.3,
+                pScreenY - pRadius * 0.3,
+                pRadius * 0.05,
+                pScreenX,
+                pScreenY,
+                pRadius
+            );
+            grad.addColorStop(0, '#00f0ff');   // Cyan centro de luz
+            grad.addColorStop(0.3, '#7b00ff'); // Púrpura medio
+            grad.addColorStop(0.7, '#ff007f'); // Rosa exterior
+            grad.addColorStop(1, '#020208');   // Borde sombreado oscuro
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(pScreenX, pScreenY, pRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Atmósfera exterior brillante
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
+            ctx.lineWidth = Math.max(1, 4 * pScale);
+            ctx.stroke();
+            
+            // Nombre del planeta e indicador de distancia
+            ctx.fillStyle = '#00f0ff';
+            ctx.font = 'bold 12px Orbitron';
+            ctx.textAlign = 'center';
+            ctx.fillText("PLANETA OBJETIVO", pScreenX, pScreenY - pRadius - 15);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '10px Orbitron';
+            ctx.fillText(`${Math.round(pRel.z)}m`, pScreenX, pScreenY - pRadius - 2);
+            ctx.restore();
+            
+            // Verificar si el planeta está visible en la pantalla
+            if (pScreenX >= 40 && pScreenX <= canvas.width - 40 && pScreenY >= 40 && pScreenY <= canvas.height - 40) {
+                planetOnScreen = true;
+            }
+        }
+    }
+    
+    // 4.6 Dibujar indicador de planeta siempre en pantalla si está fuera de vista
+    if (!planetOnScreen) {
+        ctx.save();
+        // Calcular vector hacia el planeta en coordenadas relativas
+        let dx = pRel.x;
+        let dy = pRel.y;
+        
+        // Si el planeta está detrás, invertimos el vector para que apunte en la dirección correcta si nos damos la vuelta
+        if (pRel.z <= 50) {
+            dx = -pRel.x;
+            dy = -pRel.y;
+            // Si el planeta está justo detrás, asegurar que no sea exactamente cero
+            if (dx === 0 && dy === 0) dx = 1;
+        }
+        
+        const angle = Math.atan2(dy, dx);
+        
+        // Encontrar punto en el borde de la pantalla
+        const margin = 50;
+        const halfW = canvas.width / 2 - margin;
+        const halfH = canvas.height / 2 - margin;
+        
+        let edgeX, edgeY;
+        const cosA = Math.cos(angle);
+        const sinA = Math.sin(angle);
+        
+        if (Math.abs(cosA * halfH) > Math.abs(sinA * halfW)) {
+            edgeX = canvas.width / 2 + Math.sign(cosA) * halfW;
+            edgeY = canvas.height / 2 + (Math.sign(cosA) * halfW) * (sinA / cosA);
+        } else {
+            edgeX = canvas.width / 2 + (Math.sign(sinA) * halfH) * (cosA / sinA);
+            edgeY = canvas.height / 2 + Math.sign(sinA) * halfH;
+        }
+        
+        // Dibujar flecha indicadora parpadeante de color Cyan/Rosa
+        const timeFactor = (Date.now() % 1000) / 1000;
+        const alphaVal = 0.5 + Math.sin(timeFactor * Math.PI * 2) * 0.3;
+        
+        ctx.strokeStyle = `rgba(0, 240, 255, ${alphaVal})`;
+        ctx.fillStyle = `rgba(255, 0, 127, ${alphaVal})`;
+        ctx.lineWidth = 2;
+        
+        // Dibujar triángulo rotado
+        ctx.translate(edgeX, edgeY);
+        ctx.rotate(angle);
+        
+        ctx.beginPath();
+        ctx.moveTo(15, 0);   // Punta
+        ctx.lineTo(-8, -8);  // Esquina izquierda
+        ctx.lineTo(-3, 0);   // Hendidura centro
+        ctx.lineTo(-8, 8);   // Esquina derecha
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        // Añadir icono del planeta e indicador de distancia
+        ctx.rotate(-angle); // Deshacer rotación para pintar texto derecho
+        ctx.fillStyle = '#00f0ff';
+        ctx.font = 'bold 9px Orbitron';
+        ctx.textAlign = edgeX < canvas.width / 2 ? 'left' : 'right';
+        const textOffsetX = edgeX < canvas.width / 2 ? 20 : -20;
+        ctx.fillText(`🪐 ${Math.round(state.planetZ)}m`, textOffsetX, 3);
+        
+        ctx.restore();
+    }
+
     // 5. Dibujar Láseres de Disparo (Optimizado con doble trazado y sin shadowBlur)
     state.lasers.forEach(laser => {
         const color = laser.color || '#00f0ff';
@@ -848,27 +1004,56 @@ function draw() {
 
     // 6. Dibujar el HUD/Puntero central del cañón (Cockpit Targeter)
     drawReticle();
+
+    // 7. Dibujar información de velocidad y navegación (HUD lateral)
+    ctx.save();
+    // Cuadro de navegación en la parte superior izquierda
+    ctx.fillStyle = 'rgba(6, 6, 20, 0.65)';
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(20, 80, 180, 60, 6);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#00f0ff';
+    ctx.font = 'bold 9px Orbitron';
+    ctx.fillText("SISTEMA DE NAVEGACIÓN", 30, 98);
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '11px Orbitron';
+    ctx.fillText(`VELOCIDAD: ${Math.round(state.speed)} km/h`, 30, 116);
+    ctx.fillText(`DISTANCIA: ${Math.round(state.planetZ)} m`, 30, 131);
+    ctx.restore();
 }
 
 function drawSpatialGrid() {
     // Dibujamos unas líneas radiales que parten del centro proyectado de la pantalla
     // basadas en nuestro rumbo (camYaw y camPitch) para simular un túnel de datos
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.06)';
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.08)';
     ctx.lineWidth = 1;
     
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
-    // Líneas circulares de referencia (HUD de navegación en el espacio)
-    const ringCount = 4;
-    for (let i = 1; i <= ringCount; i++) {
-        const baseRadius = 150 * i;
+    // Incrementar offset del grid según velocidad de la nave para dar efecto túnel
+    state.gridOffset = (state.gridOffset || 0) + (0.3 + state.speed * 0.05);
+    state.gridOffset %= 150;
+    
+    // Líneas circulares de referencia (HUD de navegación en el espacio) que se expanden
+    const ringCount = 5;
+    for (let i = 0; i <= ringCount; i++) {
+        const radius = (150 * i) + state.gridOffset;
+        // Desvanecimiento suave en los bordes y en el centro
+        const opacity = Math.min(0.12, (1 - (radius / 900)) * 0.15);
+        ctx.strokeStyle = `rgba(0, 240, 255, ${opacity})`;
         ctx.beginPath();
-        ctx.arc(centerX, centerY, baseRadius, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
         ctx.stroke();
     }
     
     // Ejes horizontales y verticales
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.06)';
     ctx.beginPath();
     ctx.moveTo(centerX - 400, centerY);
     ctx.lineTo(centerX + 400, centerY);
@@ -944,6 +1129,11 @@ function initGame() {
     state.overheated = false;
     state.sensorEventsCount = 0; // Resetear contador para verificar si llegan lecturas reales
     
+    // Resetear velocidad y acelerador visual a 0
+    state.speed = 0;
+    updateThrottleUI(0);
+    updateMobileControlsVisibility();
+    
     initStars();
     state.drones = [];
     state.lasers = [];
@@ -984,6 +1174,7 @@ function takeDamageEffects() {
 function gameOverMultiplayer(score, wave) {
     state.playing = false;
     document.getElementById('hud').classList.add('hidden');
+    updateMobileControlsVisibility(); // Ocultar controles táctiles móviles
     
     const overlay = document.getElementById('overlay');
     overlay.classList.add('active');
@@ -1079,6 +1270,14 @@ function connectWebSocket() {
                 state.wave = msg.wave;
                 state.shield = msg.shield;
                 state.armor = msg.armor;
+                if (msg.planetX !== undefined) {
+                    state.planetX = msg.planetX;
+                    state.planetY = msg.planetY;
+                    state.planetZ = msg.planetZ;
+                    state.targetPlanetX = msg.planetX;
+                    state.targetPlanetY = msg.planetY;
+                    state.targetPlanetZ = msg.planetZ;
+                }
                 updateHud();
             }
             
@@ -1114,6 +1313,13 @@ function connectWebSocket() {
                     updatedDrones.push(localDrone);
                 });
                 state.drones = updatedDrones;
+                
+                if (msg.planetX !== undefined) {
+                    state.targetPlanetX = msg.planetX;
+                    state.targetPlanetY = msg.planetY;
+                    state.targetPlanetZ = msg.planetZ;
+                    state.speed = msg.speed;
+                }
                 
                 state.shield = msg.shield;
                 state.armor = msg.armor;
@@ -1200,6 +1406,15 @@ function connectWebSocket() {
             else if (msg.type === 'waveStart') {
                 state.wave = msg.wave;
                 state.shield = msg.shield;
+                if (msg.planetX !== undefined) {
+                    state.planetX = msg.planetX;
+                    state.planetY = msg.planetY;
+                    state.planetZ = msg.planetZ;
+                    state.targetPlanetX = msg.planetX;
+                    state.targetPlanetY = msg.planetY;
+                    state.targetPlanetZ = msg.planetZ;
+                    state.speed = 0;
+                }
                 showGameAlert(`OLEADA COOPERATIVA ${state.wave}`);
                 playNewWaveSound();
                 updateHud();
@@ -1306,3 +1521,110 @@ function drawMenuBackground() {
     requestAnimationFrame(drawMenuBackground);
 }
 drawMenuBackground();
+
+// --- MANEJO DE CONTROLES TÁCTILES MÓVILES ---
+function updateMobileControlsVisibility() {
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const controls = document.getElementById('mobile-controls');
+    if (!controls) return;
+    
+    if (isTouch && state.screenRotated && state.playing) {
+        controls.classList.remove('hidden');
+    } else {
+        controls.classList.add('hidden');
+    }
+}
+
+// Configurar controladores táctiles para acelerador y disparo
+const throttleTrack = document.getElementById('throttle-container');
+const throttleBar = document.getElementById('throttle-bar');
+const throttleKnob = document.getElementById('throttle-knob');
+let isAdjustingThrottle = false;
+
+function handleThrottle(e) {
+    if (!state.playing) return;
+    const track = document.querySelector('.slider-track');
+    const rect = track.getBoundingClientRect();
+    
+    let clientY = e.clientY;
+    if (e.touches && e.touches[0]) {
+        clientY = e.touches[0].clientY;
+    } else if (e.clientY === undefined && e.originalEvent && e.originalEvent.touches) {
+        clientY = e.originalEvent.touches[0].clientY;
+    }
+    
+    let val = (rect.bottom - clientY) / rect.height;
+    val = Math.max(0, Math.min(1, val));
+    
+    updateThrottleUI(val);
+    sendThrottleToServer(val);
+}
+
+function updateThrottleUI(val) {
+    const percentage = val * 100;
+    if (throttleBar) throttleBar.style.height = `${percentage}%`;
+    if (throttleKnob) throttleKnob.style.bottom = `calc(${percentage}% - 17px)`;
+}
+
+function sendThrottleToServer(val) {
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send(JSON.stringify({
+            type: 'throttle',
+            value: val
+        }));
+    }
+}
+
+if (throttleTrack) {
+    // Touch events para soporte móvil nativo completo
+    throttleTrack.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        isAdjustingThrottle = true;
+        handleThrottle(e);
+    }, { passive: true });
+    
+    window.addEventListener('touchmove', (e) => {
+        if (isAdjustingThrottle) {
+            e.stopPropagation();
+            if (e.cancelable) e.preventDefault();
+            handleThrottle(e);
+        }
+    }, { passive: false });
+    
+    window.addEventListener('touchend', (e) => {
+        if (isAdjustingThrottle) {
+            isAdjustingThrottle = false;
+        }
+    }, { passive: true });
+
+    // Pointer events como soporte secundario
+    throttleTrack.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        isAdjustingThrottle = true;
+        handleThrottle(e);
+    });
+    
+    window.addEventListener('pointermove', (e) => {
+        if (isAdjustingThrottle) {
+            e.stopPropagation();
+            handleThrottle(e);
+        }
+    });
+    
+    window.addEventListener('pointerup', () => {
+        if (isAdjustingThrottle) {
+            isAdjustingThrottle = false;
+        }
+    });
+}
+
+const fireButton = document.getElementById('fire-button');
+if (fireButton) {
+    const triggerFire = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        shoot(canvas.width / 2, canvas.height / 2);
+    };
+    fireButton.addEventListener('touchstart', triggerFire, { passive: false });
+    fireButton.addEventListener('pointerdown', triggerFire);
+}

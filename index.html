@@ -121,6 +121,22 @@
     <!-- Lienzo de Dibujo -->
     <canvas id="gameCanvas"></canvas>
 
+    <!-- Controles táctiles para móvil en horizontal -->
+    <div id="mobile-controls" class="mobile-controls hidden">
+        <div id="throttle-container" class="control-zone left-zone">
+            <div class="slider-label">THRUST</div>
+            <div class="slider-track">
+                <div id="throttle-bar" class="slider-bar"></div>
+                <div id="throttle-knob" class="slider-knob"></div>
+            </div>
+        </div>
+        <div id="fire-button" class="control-zone right-zone">
+            <div class="fire-btn-inner">
+                <span class="fire-label">FIRE</span>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
