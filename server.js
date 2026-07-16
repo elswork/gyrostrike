@@ -79,7 +79,7 @@ const gameState = {
     droneIdCounter: 0,
     planetX: 0,
     planetY: 0,
-    planetZ: 10000,
+    planetZ: 3000,
     speed: 0
 };
 
@@ -259,7 +259,7 @@ function nextWave() {
     // Reiniciar planeta objetivo para la nueva fase
     gameState.planetX = (Math.random() - 0.5) * 2000;
     gameState.planetY = (Math.random() - 0.5) * 1000;
-    gameState.planetZ = 10000 + gameState.wave * 2000; // Más largo cada oleada
+    gameState.planetZ = 3000 + gameState.wave * 1000; // Más largo cada oleada
     gameState.speed = 0;
     // Resetear aceleración de los jugadores para que inicien parados la nueva fase
     gameState.players.forEach(p => p.throttle = 0);
@@ -335,7 +335,7 @@ wss.on('connection', (ws) => {
         gameState.drones = [];
         gameState.planetX = (Math.random() - 0.5) * 1500;
         gameState.planetY = (Math.random() - 0.5) * 800;
-        gameState.planetZ = 10000;
+        gameState.planetZ = 3000;
         gameState.speed = 0;
         spawnDrone();
     }
