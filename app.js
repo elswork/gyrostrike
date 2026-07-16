@@ -352,8 +352,12 @@ function setupSensorListeners() {
         dbgApi.style.color = "var(--neon-green)";
     }
     
-    window.addEventListener('deviceorientation', handleOrientation);
-    window.addEventListener('deviceorientationabsolute', handleOrientation);
+    // Registrar solo uno de los eventos para evitar actualizaciones duplicadas en conflicto (que causan oscilaciones en diagonal)
+    if ('ondeviceorientationabsolute' in window) {
+        window.addEventListener('deviceorientationabsolute', handleOrientation);
+    } else {
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
 }
 
 function showSensorFallback(customMessage) {
