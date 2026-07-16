@@ -468,9 +468,14 @@ function updateCameraFromSensors() {
     if (Math.abs(yaw) < DEADZONE) targetYaw = 0;
     if (Math.abs(pitch) < DEADZONE) targetPitch = 0;
 
-    // Aplicar interpolación lineal (Lerp) para movimiento cinemático y suave
-    state.camYaw += (targetYaw - state.camYaw) * INPUT_LERP;
-    state.camPitch += (targetPitch - state.camPitch) * INPUT_LERP;
+    // Calcular la diferencia de ángulo más corta (normalizada a [-PI, PI]) para evitar giros bruscos de 360 grados
+    let diffYaw = targetYaw - state.camYaw;
+    diffYaw = Math.atan2(Math.sin(diffYaw), Math.cos(diffYaw));
+    state.camYaw += diffYaw * INPUT_LERP;
+    
+    let diffPitch = targetPitch - state.camPitch;
+    diffPitch = Math.atan2(Math.sin(diffPitch), Math.cos(diffPitch));
+    state.camPitch += diffPitch * INPUT_LERP;
     
     // Limitar la inclinación vertical máxima para no voltear del todo la cámara
     state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch));
