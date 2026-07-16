@@ -452,38 +452,42 @@ function updateCameraFromSensors() {
     let ys = yr;
     let zs = zr;
     
-    // Obtener la orientación física de la pantalla (landscape vs portrait)
-    const isLandscape = window.innerWidth > window.innerHeight;
+    // Detectar si es iOS (Safari) ya que es la única plataforma que no auto-orienta los sensores a la pantalla
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
-    // Obtener el ángulo reportado por el navegador
-    let angle = 0;
-    if (window.screen && window.screen.orientation) {
-        angle = window.screen.orientation.angle || 0;
-    } else if (typeof window.orientation !== 'undefined') {
-        angle = window.orientation;
+    if (isIOS) {
+        // Obtener la orientación física de la pantalla (landscape vs portrait)
+        const isLandscape = window.innerWidth > window.innerHeight;
+        
+        // Obtener el ángulo reportado por el navegador
+        let angle = 0;
+        if (window.screen && window.screen.orientation) {
+            angle = window.screen.orientation.angle || 0;
+        } else if (typeof window.orientation !== 'undefined') {
+            angle = window.orientation;
+        }
+        
+        // Si está en landscape pero reporta 0, asumimos un ángulo de 90 grados para corregir el intercambio de ejes
+        if (isLandscape && angle === 0) {
+            angle = 90;
+        }
+        
+        // Mapear los ejes de acuerdo al ángulo físico de la pantalla (solo necesario en iOS)
+        if (angle === 90) {
+            xs = yr;
+            ys = -xr;
+        } else if (angle === 270 || angle === -90) {
+            xs = -yr;
+            ys = xr;
+        } else if (angle === 180) {
+            xs = -xr;
+            ys = -yr;
+        }
     }
     
-    // Si está en landscape pero reporta 0 (caso común en rotación bloqueada o fallos de API),
-    // asumimos un ángulo de 90 grados para corregir el intercambio de ejes
-    if (isLandscape && angle === 0) {
-        angle = 90;
-    }
-    
-    // Mapear los ejes de acuerdo al ángulo físico de la pantalla
-    if (angle === 90) {
-        xs = yr;
-        ys = -xr;
-    } else if (angle === 270 || angle === -90) {
-        xs = -yr;
-        ys = xr;
-    } else if (angle === 180) {
-        xs = -xr;
-        ys = -yr;
-    }
-    
-    // Calcular yaw y pitch usando la proyección 3D del vector de dirección
+    // Calcular yaw y pitch usando la proyección 3D del vector de dirección con clamp de seguridad para evitar NaN en asin
     const yaw = Math.atan2(xs, zs);
-    const pitch = Math.asin(ys);
+    const pitch = Math.asin(Math.max(-1.0, Math.min(1.0, ys)));
     
     // --- PARÁMETROS CONFIGURABLES ---
     const SENSITIVITY = 2.0;   // Multiplicador de escala física
