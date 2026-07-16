@@ -464,7 +464,7 @@ function updateCameraFromSensors() {
     const zs = zr;
     
     // Calcular yaw y pitch usando la proyección 3D del vector de dirección alineado a la pantalla
-    const yaw = Math.atan2(xs, -zs);
+    const yaw = Math.atan2(xs, zs);
     const pitch = Math.asin(ys);
     
     // Sensibilidad del giroscopio (multiplicador para movimiento fluido y de rango completo)
