@@ -1559,17 +1559,10 @@ const throttleBar = document.getElementById('throttle-bar');
 const throttleKnob = document.getElementById('throttle-knob');
 let isAdjustingThrottle = false;
 
-function handleThrottle(e) {
+function handleThrottle(clientY) {
     if (!state.playing) return;
     const track = document.querySelector('.slider-track');
     const rect = track.getBoundingClientRect();
-    
-    let clientY = e.clientY;
-    if (e.touches && e.touches[0]) {
-        clientY = e.touches[0].clientY;
-    } else if (e.clientY === undefined && e.originalEvent && e.originalEvent.touches) {
-        clientY = e.originalEvent.touches[0].clientY;
-    }
     
     let val = (rect.bottom - clientY) / rect.height;
     val = Math.max(0, Math.min(1, val));
@@ -1594,43 +1587,64 @@ function sendThrottleToServer(val) {
 }
 
 if (throttleTrack) {
-    // Touch events para soporte móvil nativo completo
+    // Touch events para soporte móvil nativo multipunto
     throttleTrack.addEventListener('touchstart', (e) => {
         e.stopPropagation();
+        const touch = e.changedTouches[0];
+        state.throttleTouchId = touch.identifier;
         isAdjustingThrottle = true;
-        handleThrottle(e);
+        handleThrottle(touch.clientY);
     }, { passive: true });
     
     window.addEventListener('touchmove', (e) => {
         if (isAdjustingThrottle) {
-            e.stopPropagation();
-            if (e.cancelable) e.preventDefault();
-            handleThrottle(e);
+            let throttleTouch = null;
+            for (let i = 0; i < e.touches.length; i++) {
+                if (e.touches[i].identifier === state.throttleTouchId) {
+                    throttleTouch = e.touches[i];
+                    break;
+                }
+            }
+            if (throttleTouch) {
+                e.stopPropagation();
+                if (e.cancelable) e.preventDefault();
+                handleThrottle(throttleTouch.clientY);
+            }
         }
     }, { passive: false });
     
     window.addEventListener('touchend', (e) => {
         if (isAdjustingThrottle) {
-            isAdjustingThrottle = false;
+            let finished = true;
+            for (let i = 0; i < e.touches.length; i++) {
+                if (e.touches[i].identifier === state.throttleTouchId) {
+                    finished = false;
+                    break;
+                }
+            }
+            if (finished) {
+                isAdjustingThrottle = false;
+            }
         }
     }, { passive: true });
 
-    // Pointer events como soporte secundario
+    // Pointer events como soporte secundario (ratón / escritorio)
     throttleTrack.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch') return;
         e.stopPropagation();
         isAdjustingThrottle = true;
-        handleThrottle(e);
+        handleThrottle(e.clientY);
     });
     
     window.addEventListener('pointermove', (e) => {
-        if (isAdjustingThrottle) {
+        if (isAdjustingThrottle && e.pointerType !== 'touch') {
             e.stopPropagation();
-            handleThrottle(e);
+            handleThrottle(e.clientY);
         }
     });
     
-    window.addEventListener('pointerup', () => {
-        if (isAdjustingThrottle) {
+    window.addEventListener('pointerup', (e) => {
+        if (isAdjustingThrottle && e.pointerType !== 'touch') {
             isAdjustingThrottle = false;
         }
     });
