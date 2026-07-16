@@ -1403,6 +1403,7 @@ function connectWebSocket() {
                     state.targetPlanetZ = msg.planetZ;
                     state.speed = 0;
                 }
+                updateThrottleUI(0); // Resetear acelerador visual a cero al pasar de pantalla
                 showGameAlert(`OLEADA COOPERATIVA ${state.wave}`);
                 playNewWaveSound();
                 updateHud();
