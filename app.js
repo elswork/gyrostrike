@@ -819,6 +819,7 @@ function draw() {
 
     // 4.5 Dibujar Planeta Objetivo (si está en rango visual)
     const pRel = getRelative3D(state.planetX, state.planetY, state.planetZ);
+    const planetDist = Math.sqrt(state.planetX * state.planetX + state.planetY * state.planetY + state.planetZ * state.planetZ);
     let planetOnScreen = false;
     let pScreenX = 0, pScreenY = 0;
     
@@ -863,7 +864,7 @@ function draw() {
             ctx.fillText("PLANETA OBJETIVO", pScreenX, pScreenY - pRadius - 15);
             ctx.fillStyle = '#ffffff';
             ctx.font = '10px Orbitron';
-            ctx.fillText(`${Math.round(pRel.z)}m`, pScreenX, pScreenY - pRadius - 2);
+            ctx.fillText(`${Math.round(planetDist)}m`, pScreenX, pScreenY - pRadius - 2);
             ctx.restore();
             
             // Verificar si el planeta está visible en la pantalla
@@ -934,7 +935,7 @@ function draw() {
         ctx.font = 'bold 9px Orbitron';
         ctx.textAlign = edgeX < canvas.width / 2 ? 'left' : 'right';
         const textOffsetX = edgeX < canvas.width / 2 ? 20 : -20;
-        ctx.fillText(`🪐 ${Math.round(state.planetZ)}m`, textOffsetX, 3);
+        ctx.fillText(`🪐 ${Math.round(planetDist)}m`, textOffsetX, 3);
         
         ctx.restore();
     }
@@ -1022,8 +1023,9 @@ function draw() {
     
     ctx.fillStyle = '#ffffff';
     ctx.font = '11px Orbitron';
+    const planetDist = Math.sqrt(state.planetX * state.planetX + state.planetY * state.planetY + state.planetZ * state.planetZ);
     ctx.fillText(`VELOCIDAD: ${Math.round(state.speed)} km/h`, 30, 116);
-    ctx.fillText(`DISTANCIA: ${Math.round(state.planetZ)} m`, 30, 131);
+    ctx.fillText(`DISTANCIA: ${Math.round(planetDist)} m`, 30, 131);
     ctx.restore();
 }
 
@@ -1480,6 +1482,36 @@ window.addEventListener('keydown', (e) => {
         calibrateSensors();
     }
 });
+
+// Pantalla completa (Fullscreen API)
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.error(`Error al intentar activar pantalla completa: ${err.message}`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+}
+
+const btnFullscreen = document.getElementById('btn-fullscreen');
+if (btnFullscreen) {
+    btnFullscreen.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFullscreen();
+    });
+}
+
+const btnGameFullscreen = document.getElementById('btn-game-fullscreen');
+if (btnGameFullscreen) {
+    btnGameFullscreen.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFullscreen();
+    });
+}
+
 
 // Inicializar el fondo espacial de pantalla de título al cargar
 initStars();

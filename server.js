@@ -175,8 +175,9 @@ function serverPhysicsLoop() {
     gameState.planetY -= dy;
     gameState.planetZ -= dz;
     
-    // Si llegamos al planeta objetivo
-    if (gameState.planetZ <= 300) {
+    // Si llegamos al planeta objetivo (distancia 3D <= 400m)
+    const planetDist = Math.sqrt(gameState.planetX * gameState.planetX + gameState.planetY * gameState.planetY + gameState.planetZ * gameState.planetZ);
+    if (planetDist <= 400) {
         nextWave();
         return;
     }
