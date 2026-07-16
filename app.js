@@ -399,31 +399,53 @@ function calibrateSensors() {
     if (audioCtx) playHitSound();
 }
 
+function getRotationMatrix(alpha, beta, gamma) {
+    const degToRad = Math.PI / 180;
+    const a = alpha * degToRad;
+    const b = beta * degToRad;
+    const g = gamma * degToRad;
+
+    const cA = Math.cos(a), sA = Math.sin(a);
+    const cB = Math.cos(b), sB = Math.sin(b);
+    const cG = Math.cos(g), sG = Math.sin(g);
+
+    // R = Rz(a) * Rx(b) * Ry(g)
+    return [
+        cA * cG - sA * sB * sG,  -sA * cB,  cA * sG + sA * sB * cG,
+        sA * cG + cA * sB * sG,   cA * cB,  sA * sG - cA * sB * cG,
+        -cB * sG,                 sB,       cB * cG
+    ];
+}
+
 function updateCameraFromSensors() {
     if (!state.useGyro) return;
     
-    // Calcular deltas con control de saltos cíclicos de 360 grados
-    let deltaAlpha = state.currentSensors.alpha - state.sensorRef.alpha;
-    if (deltaAlpha > 180) deltaAlpha -= 360;
-    if (deltaAlpha < -180) deltaAlpha += 360;
-    
-    let deltaBeta = state.currentSensors.beta - state.sensorRef.beta;
-    if (deltaBeta > 180) deltaBeta -= 360;
-    if (deltaBeta < -180) deltaBeta += 360;
-    
-    // Sensibilidad del giroscopio
-    const sensitivity = 0.035;
-    
-    if (state.screenRotated) {
-        // En horizontal (landscape) el cabeceo del dispositivo mueve arriba/abajo
-        // y el alabeo o cambio de rumbo mueve izquierda/derecha
-        state.camYaw = deltaBeta * sensitivity * 1.5;
-        state.camPitch = -(state.currentSensors.gamma - state.sensorRef.gamma) * sensitivity * 1.5; // Invertido para apuntado natural
-    } else {
-        // En vertical (portrait)
-        state.camYaw = -deltaAlpha * sensitivity;
-        state.camPitch = -deltaBeta * sensitivity; // Invertido para apuntado natural
+    if (state.sensorRef.alpha === null) {
+        calibrateSensors();
+        return;
     }
+    
+    const rRef = getRotationMatrix(state.sensorRef.alpha, state.sensorRef.beta, state.sensorRef.gamma);
+    const rCurr = getRotationMatrix(state.currentSensors.alpha, state.currentSensors.beta, state.currentSensors.gamma);
+    
+    // Calcular la tercera columna de R_rel = R_ref^T * R_curr
+    const rRel13 = rRef[0] * rCurr[2] + rRef[3] * rCurr[5] + rRef[6] * rCurr[8];
+    const rRel23 = rRef[1] * rCurr[2] + rRef[4] * rCurr[5] + rRef[7] * rCurr[8];
+    const rRel33 = rRef[2] * rCurr[2] + rRef[5] * rCurr[5] + rRef[8] * rCurr[8];
+    
+    // El vector relativo apuntando es: xr = -rRel13, yr = -rRel23, zr = -rRel33
+    const xr = -rRel13;
+    const yr = -rRel23;
+    const zr = -rRel33;
+    
+    // Calcular yaw y pitch usando la proyección 3D del vector de dirección
+    const yaw = Math.atan2(xr, -zr);
+    const pitch = Math.asin(yr);
+    
+    // Sensibilidad del giroscopio (multiplicador para movimiento fluido y de rango completo)
+    const sensitivity = 2.0;
+    state.camYaw = yaw * sensitivity;
+    state.camPitch = pitch * sensitivity;
     
     // Limitar la inclinación vertical máxima para no voltear del todo la cámara
     state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch));
@@ -549,9 +571,16 @@ function update() {
         }
     });
     
-    // 3. Drones: aproximación visual suave local (las colisiones y borrados los maneja el servidor)
+    // 3. Drones: interpolación suave hacia las posiciones autoritativas del servidor (evita saltos bruscos)
     state.drones.forEach(drone => {
-        drone.z -= drone.speed || 4;
+        if (drone.targetX !== undefined) {
+            const lerpFactor = 0.18; // Suavizado de movimiento (18% del camino por frame)
+            drone.x += (drone.targetX - drone.x) * lerpFactor;
+            drone.y += (drone.targetY - drone.y) * lerpFactor;
+            drone.z += (drone.targetZ - drone.z) * lerpFactor;
+        } else {
+            drone.z -= drone.speed || 4;
+        }
         drone.rotation = (drone.rotation || 0) + 0.02;
     });
     
@@ -1054,7 +1083,38 @@ function connectWebSocket() {
             }
             
             else if (msg.type === 'state') {
-                state.drones = msg.drones;
+                // Actualizar drones existentes o crear nuevos con interpolación suave
+                const updatedDrones = [];
+                msg.drones.forEach(serverDrone => {
+                    let localDrone = state.drones.find(d => d.id === serverDrone.id);
+                    if (localDrone) {
+                        // Actualizar objetivos del servidor
+                        localDrone.targetX = serverDrone.x;
+                        localDrone.targetY = serverDrone.y;
+                        localDrone.targetZ = serverDrone.z;
+                        localDrone.speed = serverDrone.speed;
+                        localDrone.type = serverDrone.type;
+                        localDrone.size = serverDrone.size;
+                    } else {
+                        // Crear dron con posición inicial y objetivo iguales
+                        localDrone = {
+                            id: serverDrone.id,
+                            x: serverDrone.x,
+                            y: serverDrone.y,
+                            z: serverDrone.z,
+                            targetX: serverDrone.x,
+                            targetY: serverDrone.y,
+                            targetZ: serverDrone.z,
+                            speed: serverDrone.speed,
+                            type: serverDrone.type,
+                            size: serverDrone.size,
+                            rotation: 0
+                        };
+                    }
+                    updatedDrones.push(localDrone);
+                });
+                state.drones = updatedDrones;
+                
                 state.shield = msg.shield;
                 state.armor = msg.armor;
                 state.wave = msg.wave;
