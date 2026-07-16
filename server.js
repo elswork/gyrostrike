@@ -98,7 +98,7 @@ let nextColorIndex = 0;
 // --- FÍSICA Y SPAWN DE DRONES EN EL SERVIDOR ---
 
 function spawnDrone() {
-    if (!gameState.active || gameState.drones.length >= 6) return;
+    if (!gameState.active || gameState.drones.length >= 3) return;
     
     const angle = Math.random() * Math.PI * 2;
     const distance = 250 + Math.random() * 350;
@@ -274,16 +274,12 @@ function nextWave() {
     });
 }
 
-// Spawner periódico
+// Spawner periódico (reducido a 5000ms e individual para menor congestión)
 setInterval(() => {
     if (gameState.active) {
         spawnDrone();
-        // Spawnea doble si hay más jugadores
-        if (gameState.players.size > 2 && Math.random() > 0.4) {
-            spawnDrone();
-        }
     }
-}, 3000);
+}, 5000);
 
 // Bucle de físicas (33ms = 30fps aprox)
 setInterval(serverPhysicsLoop, 33);

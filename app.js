@@ -445,25 +445,12 @@ function updateCameraFromSensors() {
     
     // El vector relativo apuntando es: xr = -rRel13, yr = -rRel23, zr = -rRel33
     const xr = -rRel13;
-    const yr = -rRel23;
-    const zr = -rRel33;
+    // Los navegadores modernos ya compensan la rotación de pantalla en el API DeviceOrientation
+    const xs = xr;
+    const ys = -rRel23;
+    const zs = -rRel33;
     
-    // Obtener la rotación actual de la pantalla para compensar el modo horizontal (landscape)
-    let screenAngle = 0;
-    if (window.screen && window.screen.orientation) {
-        screenAngle = (window.screen.orientation.angle || 0) * Math.PI / 180;
-    } else if (typeof window.orientation !== 'undefined') {
-        screenAngle = window.orientation * Math.PI / 180;
-    }
-    
-    // Rotar el vector en el plano XY según la rotación de la pantalla
-    const cosS = Math.cos(-screenAngle);
-    const sinS = Math.sin(-screenAngle);
-    const xs = xr * cosS - yr * sinS;
-    const ys = xr * sinS + yr * cosS;
-    const zs = zr;
-    
-    // Calcular yaw y pitch usando la proyección 3D del vector de dirección alineado a la pantalla
+    // Calcular yaw y pitch usando la proyección 3D del vector de dirección
     const yaw = Math.atan2(xs, zs);
     const pitch = Math.asin(ys);
     
