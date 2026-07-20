@@ -7,8 +7,16 @@ const PORT = 80;
 
 // --- HTTP SERVER (Servidor de archivos estáticos) ---
 const server = http.createServer((req, res) => {
-    let filePath = req.url === '/' ? '/index.html' : req.url;
-    filePath = path.join(__dirname, filePath);
+    let cleanPath = '/index.html';
+    try {
+        const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        cleanPath = parsedUrl.pathname === '/' ? '/index.html' : parsedUrl.pathname;
+    } catch(e) {
+        cleanPath = req.url.split('?')[0];
+        if (cleanPath === '/') cleanPath = '/index.html';
+    }
+
+    let filePath = path.join(__dirname, cleanPath);
     
     // Evitar salir del directorio raíz
     if (!filePath.startsWith(__dirname)) {
@@ -16,7 +24,7 @@ const server = http.createServer((req, res) => {
         return res.end('Access Denied');
     }
 
-    const extname = path.extname(filePath);
+    const extname = path.extname(filePath).toLowerCase();
     let contentType = 'text/html';
     switch (extname) {
         case '.js':

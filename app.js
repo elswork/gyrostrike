@@ -66,6 +66,7 @@ const state = {
     controlMode: 'mouse', // 'mouse', 'pointerlock', 'keyboard', 'gyro', 'touch'
     usePointerLock: true,
     pointerLocked: false,
+    invertX: true,
     keys: {
         w: false,
         s: false,
@@ -410,6 +411,7 @@ function setupPCControls() {
     const instPc = document.getElementById('instructions-pc');
     const instMobile = document.getElementById('instructions-mobile');
     const chkPointerLock = document.getElementById('chk-pointer-lock');
+    const chkInvertX = document.getElementById('chk-invert-x');
 
     if (chkPointerLock) {
         state.usePointerLock = chkPointerLock.checked;
@@ -418,6 +420,13 @@ function setupPCControls() {
             if (!state.usePointerLock && state.pointerLocked) {
                 document.exitPointerLock();
             }
+        });
+    }
+
+    if (chkInvertX) {
+        state.invertX = chkInvertX.checked;
+        chkInvertX.addEventListener('change', (e) => {
+            state.invertX = e.target.checked;
         });
     }
 
@@ -451,6 +460,23 @@ function setupPCControls() {
 
     // Eventos de Teclado
     window.addEventListener('keydown', (e) => {
+        const key = e.key ? e.key.toLowerCase() : '';
+        const code = e.code || '';
+
+        if (key === 'escape' || code === 'Escape' || key === 'q' || code === 'KeyQ' || key === 'x' || code === 'KeyX') {
+            e.preventDefault();
+            const modal = document.getElementById('quit-modal');
+            if (modal && !modal.classList.contains('hidden')) {
+                closeQuitModal();
+                if (state.isPC && state.usePointerLock) {
+                    try { canvas.requestPointerLock(); } catch(err) {}
+                }
+            } else if (state.playing) {
+                openQuitModal();
+            }
+            return;
+        }
+
         if (!state.playing) return;
 
         if (e.code === 'KeyW' || e.code === 'ArrowUp') state.keys.w = true;
@@ -488,9 +514,11 @@ function setupPCControls() {
         state.mousePos.x = e.clientX;
         state.mousePos.y = e.clientY;
 
+        const invertMult = state.invertX ? -1 : 1;
+
         if (state.pointerLocked && document.pointerLockElement === canvas) {
             const sensitivity = 0.0024;
-            state.camYaw -= e.movementX * sensitivity;
+            state.camYaw -= e.movementX * sensitivity * invertMult;
             state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch + e.movementY * sensitivity));
         } else if (state.isPC && !state.useGyro && !state.isDragging) {
             const centerX = canvas.width / 2;
@@ -498,8 +526,8 @@ function setupPCControls() {
             const normX = (e.clientX - centerX) / centerX;
             const normY = (e.clientY - centerY) / centerY;
 
-            const targetYaw = -normX * (Math.PI / 2.2);
-            const targetPitch = -normY * (Math.PI / 3.2);
+            const targetYaw = -normX * (Math.PI / 2.2) * invertMult;
+            const targetPitch = normY * (Math.PI / 3.2);
 
             state.camYaw += (targetYaw - state.camYaw) * 0.15;
             state.camPitch += (targetPitch - state.camPitch) * 0.15;
@@ -522,7 +550,9 @@ function setupPCControls() {
         }
 
         if (state.pointerLocked) {
-            showGameAlert("🔒 RATÓN CAPTURADO (ESC PARA LIBERAR)");
+            showGameAlert("🔒 RATÓN CAPTURADO (ESC PARA SALIR)");
+        } else if (state.playing && state.isPC) {
+            openQuitModal();
         }
     });
 }
@@ -771,11 +801,12 @@ function update() {
         sendThrottleToServer(state.currentThrottleVal);
     }
 
+    const invertMult = state.invertX ? -1 : 1;
     if (state.keys.a || state.keys.arrowLeft) {
-        state.camYaw += 0.025;
+        state.camYaw += 0.025 * invertMult;
     }
     if (state.keys.d || state.keys.arrowRight) {
-        state.camYaw -= 0.025;
+        state.camYaw -= 0.025 * invertMult;
     }
 
     // 1. Enfriamiento del arma
@@ -1725,6 +1756,73 @@ if (btnToggleLock) {
     btnToggleLock.addEventListener('click', (e) => {
         e.stopPropagation();
         togglePointerLock();
+    });
+}
+
+// --- MANEJO DE ABANDONO DE PARTIDA Y MODAL DE CONFIRMACIÓN ---
+
+function openQuitModal() {
+    if (!state.playing) return;
+    if (document.pointerLockElement) {
+        document.exitPointerLock();
+    }
+    const modal = document.getElementById('quit-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeQuitModal() {
+    const modal = document.getElementById('quit-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function quitGame() {
+    closeQuitModal();
+    if (document.pointerLockElement) {
+        document.exitPointerLock();
+    }
+    state.playing = false;
+    const hud = document.getElementById('hud');
+    if (hud) hud.classList.add('hidden');
+    
+    const overlay = document.getElementById('overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        overlay.classList.add('active');
+        const glowText = overlay.querySelector('.glow-text');
+        if (glowText) glowText.innerHTML = "GYRO<span>STRIKE</span>";
+        const subtitle = overlay.querySelector('.subtitle');
+        if (subtitle) subtitle.textContent = "NEON SECTOR";
+    }
+    
+    const btnStart = document.getElementById('btn-start');
+    if (btnStart) btnStart.textContent = "INICIAR COMBATE";
+    
+    updateMobileControlsVisibility();
+    showGameAlert("COMBATE ABANDONADO");
+}
+
+const btnQuitGame = document.getElementById('btn-quit-game');
+if (btnQuitGame) {
+    btnQuitGame.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openQuitModal();
+    });
+}
+
+const btnConfirmQuit = document.getElementById('btn-confirm-quit');
+if (btnConfirmQuit) {
+    btnConfirmQuit.addEventListener('click', (e) => {
+        quitGame();
+    });
+}
+
+const btnCancelQuit = document.getElementById('btn-cancel-quit');
+if (btnCancelQuit) {
+    btnCancelQuit.addEventListener('click', (e) => {
+        closeQuitModal();
+        if (state.isPC && state.usePointerLock) {
+            try { canvas.requestPointerLock(); } catch(err) {}
+        }
     });
 }
 

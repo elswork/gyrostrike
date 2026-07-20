@@ -833,3 +833,43 @@ html, body {
     display: flex;
     align-items: center;
 }
+
+/* Modal de Confirmación para Abandonar */
+.confirm-card {
+    border-color: var(--neon-pink) !important;
+    box-shadow: 0 0 40px rgba(255, 0, 127, 0.3), inset 0 0 20px rgba(255, 0, 127, 0.15) !important;
+}
+
+.glow-text-red {
+    font-family: var(--font-cyber);
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px var(--neon-pink), 0 0 40px var(--neon-pink);
+    margin-bottom: 12px;
+}
+
+.action-buttons.horizontal {
+    flex-direction: row;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.btn.danger {
+    background: linear-gradient(135deg, rgba(255, 0, 80, 0.85), rgba(200, 0, 50, 0.95)) !important;
+    color: #fff !important;
+    box-shadow: 0 0 15px rgba(255, 0, 80, 0.5) !important;
+    border: 1px solid var(--neon-pink) !important;
+}
+
+.btn.danger:hover {
+    background: linear-gradient(135deg, rgba(255, 0, 80, 1), rgba(240, 0, 60, 1)) !important;
+    box-shadow: 0 0 25px rgba(255, 0, 80, 0.8) !important;
+    transform: translateY(-2px);
+}
+
+.btn-icon-danger:hover {
+    border-color: var(--neon-pink) !important;
+    background: rgba(255, 0, 80, 0.25) !important;
+}

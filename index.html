@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
     <!-- Meta etiquetas para App en Pantalla Completa (PWA) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -61,6 +61,11 @@
                         <input type="checkbox" id="chk-pointer-lock" checked>
                         <span class="checkmark"></span>
                         Captura de Ratón 360° (Pointer Lock FPS Mode)
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="chk-invert-x" checked>
+                        <span class="checkmark"></span>
+                        Invertir Eje Horizontal X (Izquierda / Derecha)
                     </label>
                 </div>
             </div>
@@ -142,6 +147,7 @@
                 <span class="pc-hint"><span class="key-badge-sm">W / S</span> Acelerador</span>
                 <span class="pc-hint"><span class="key-badge-sm">C</span> Recalibrar</span>
                 <span class="pc-hint"><span class="key-badge-sm">L</span> Lock Ratón</span>
+                <span class="pc-hint"><span class="key-badge-sm">ESC</span> Salir</span>
             </div>
 
             <!-- Temperatura del Arma -->
@@ -157,6 +163,7 @@
                     <button id="btn-game-calibrate" class="btn-icon" title="Recalibrar giroscopio/vista (C)">🎯</button>
                     <button id="btn-toggle-pointerlock" class="btn-icon" title="Bloquear/Liberar Ratón 360° (L)">🖱️</button>
                     <button id="btn-game-fullscreen" class="btn-icon" title="Pantalla completa">📺</button>
+                    <button id="btn-quit-game" class="btn-icon btn-icon-danger" title="Abandonar partida (ESC)">🚪</button>
                 </div>
             </div>
         </div>
@@ -195,6 +202,18 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- Modal de Confirmación para Abandonar Partida -->
+    <div id="quit-modal" class="overlay hidden">
+        <div class="glass-card confirm-card">
+            <h2 class="glow-text-red">⚠️ ¿ABANDONAR COMBATE?</h2>
+            <p class="subtitle">Saldrás de la batalla actual y volverás al menú inicial.</p>
+            <div class="action-buttons horizontal">
+                <button id="btn-confirm-quit" class="btn danger">SÍ, ABANDONAR</button>
+                <button id="btn-cancel-quit" class="btn secondary">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=2"></script>
 </body>
 </html>
