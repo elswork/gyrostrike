@@ -79,7 +79,12 @@ const state = {
         arrowRight: false
     },
     mousePos: { x: 0, y: 0 },
-    currentThrottleVal: 0
+    currentThrottleVal: 0,
+    motherships: [],
+    landed: false,
+    dockingAvailable: false,
+    dockingMothershipId: null,
+    superLaserActive: false
 };
 
 // --- SISTEMA DE FEEDBACK HÁPTICO (VIBRACIÓN MÓVIL) ---
@@ -530,7 +535,17 @@ function setupPCControls() {
 
         if (e.code === 'Space' || e.code === 'KeyE') {
             e.preventDefault();
-            shoot(canvas.width / 2, canvas.height / 2);
+            if (state.dockingAvailable && !state.landed) {
+                attemptDocking();
+            } else {
+                shoot(canvas.width / 2, canvas.height / 2);
+            }
+        }
+
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') {
+            if (state.landed) {
+                takeoff();
+            }
         }
 
         if (e.code === 'KeyC' || e.code === 'KeyR') {
@@ -810,6 +825,35 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', () => {
     state.isDragging = false;
 });
+
+function attemptDocking() {
+    if (!state.dockingAvailable || !state.dockingMothershipId) return;
+    
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send(JSON.stringify({
+            type: 'dock',
+            mothershipId: state.dockingMothershipId
+        }));
+    } else {
+        state.shield = 100;
+        state.armor = 100;
+        state.landed = true;
+        state.superLaserActive = true;
+        showGameAlert(`🛬 ¡ATERRIZAJE EXITOSO! NAVE REPARADA`);
+        triggerHaptic('wave');
+        updateHud();
+    }
+}
+
+function takeoff() {
+    if (!state.landed) return;
+    state.landed = false;
+    showGameAlert(`🚀 ¡DESPEGUE HIPERESPACIAL!`);
+    triggerHaptic('hit');
+    state.currentThrottleVal = 0.8;
+    updateThrottleUI(0.8);
+    sendThrottleToServer(0.8);
+}
 
 // --- LÓGICA DE PROYECCIÓN 3D ---
 
@@ -1115,6 +1159,188 @@ function draw() {
         ctx.font = '10px Orbitron';
         ctx.textAlign = 'center';
         ctx.fillText(`${Math.round(rel.z)}m`, screenX, screenY + radius + 15);
+    });
+
+    // 4.4 Dibujar Naves Nodriza Gigantes (Dreadnought 3D)
+    state.dockingAvailable = false;
+    state.dockingMothershipId = null;
+    
+    state.motherships.forEach(ms => {
+        const rel = getRelative3D(ms.x, ms.y, ms.z);
+        if (rel.z <= 30) return;
+        
+        const scale = CONFIG.fov / rel.z;
+        const screenX = canvas.width / 2 + rel.x * scale;
+        const screenY = canvas.height / 2 + rel.y * scale;
+        const radius = (ms.size / rel.z) * CONFIG.fov;
+        
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        
+        // Renderizado del Casco según inspiración (Star Trek vs Star Wars)
+        if (ms.shipType === 'enterprise') {
+            // --- DISEÑO STAR TREK (USS Enterprise NCC-1701) ---
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+            ctx.lineWidth = Math.max(3, 7 * scale);
+            
+            // 1. Disco Saucer frontal
+            ctx.beginPath();
+            ctx.ellipse(0, -radius * 0.8, radius * 1.3, radius * 0.65, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#00f0ff';
+            ctx.lineWidth = Math.max(1.5, 3 * scale);
+            ctx.stroke();
+            
+            // Puente del Saucer
+            ctx.beginPath();
+            ctx.arc(0, -radius * 0.8, radius * 0.35, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 2. Cuello y Cuerpo de Ingeniería
+            ctx.beginPath();
+            ctx.moveTo(0, -radius * 0.2);
+            ctx.lineTo(0, radius * 0.6);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.ellipse(0, radius * 0.4, radius * 0.45, radius * 0.7, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 3. Góndolas Warp de Impulso Doble (Dual Warp Nacelles)
+            ctx.strokeStyle = '#39ff14';
+            ctx.lineWidth = Math.max(1.5, 3.5 * scale);
+            // Góndola Izquierda
+            ctx.beginPath();
+            ctx.moveTo(-radius * 0.4, radius * 0.2);
+            ctx.lineTo(-radius * 1.5, -radius * 0.1);
+            ctx.lineTo(-radius * 1.5, radius * 1.2);
+            ctx.stroke();
+            ctx.strokeRect(-radius * 1.7, -radius * 0.3, radius * 0.35, radius * 1.4);
+            
+            // Góndola Derecha
+            ctx.beginPath();
+            ctx.moveTo(radius * 0.4, radius * 0.2);
+            ctx.lineTo(radius * 1.5, -radius * 0.1);
+            ctx.lineTo(radius * 1.5, radius * 1.2);
+            ctx.stroke();
+            ctx.strokeRect(radius * 1.35, -radius * 0.3, radius * 0.35, radius * 1.4);
+
+        } else {
+            // --- DISEÑO STAR WARS (Imperial Star Destroyer) ---
+            ctx.strokeStyle = 'rgba(255, 153, 0, 0.35)';
+            ctx.lineWidth = Math.max(3, 8 * scale);
+            
+            // 1. Casco Triangular Afilado en V
+            ctx.beginPath();
+            ctx.moveTo(0, -radius * 1.7);             // Proa afilada
+            ctx.lineTo(radius * 2.0, radius * 1.1);    // Ala derecha trasera
+            ctx.lineTo(radius * 0.8, radius * 1.1);    // Hendidura motor derecho
+            ctx.lineTo(-radius * 0.8, radius * 1.1);   // Hendidura motor izquierdo
+            ctx.lineTo(-radius * 2.0, radius * 1.1);   // Ala izquierda trasera
+            ctx.closePath();
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#ff9900';
+            ctx.lineWidth = Math.max(1.5, 3 * scale);
+            ctx.stroke();
+            
+            // Panelados interiores del casco
+            ctx.beginPath();
+            ctx.moveTo(0, -radius * 1.7);
+            ctx.lineTo(0, radius * 0.7);
+            ctx.moveTo(-radius * 0.9, radius * 0.2);
+            ctx.lineTo(radius * 0.9, radius * 0.2);
+            ctx.stroke();
+            
+            // 2. Torre de Mando Estelar (Command Deck)
+            ctx.strokeStyle = '#ffff00';
+            ctx.strokeRect(-radius * 0.4, radius * 0.4, radius * 0.8, radius * 0.35);
+            // Esferas de generadores de escudo
+            ctx.beginPath();
+            ctx.arc(-radius * 0.3, radius * 0.3, radius * 0.12, 0, Math.PI * 2);
+            ctx.arc(radius * 0.3, radius * 0.3, radius * 0.12, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // 3. Motores Iónicos Triples (Resplandor Azul/Cyan)
+            ctx.fillStyle = '#00f0ff';
+            ctx.beginPath();
+            ctx.arc(-radius * 0.45, radius * 1.15, radius * 0.18, 0, Math.PI * 2);
+            ctx.arc(0, radius * 1.15, radius * 0.22, 0, Math.PI * 2);
+            ctx.arc(radius * 0.45, radius * 1.15, radius * 0.18, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Plataforma de Aterrizaje (Docking Bay)
+        const padR = Math.max(15, (60 / rel.z) * CONFIG.fov);
+        ctx.strokeStyle = '#39ff14';
+        ctx.lineWidth = Math.max(2, 4 * scale);
+        ctx.beginPath();
+        ctx.arc(0, 0, padR, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#39ff14';
+        ctx.font = 'bold 10px Orbitron';
+        ctx.textAlign = 'center';
+        ctx.fillText('🛬 DOCKING BAY', 0, 4);
+        
+        // Módulos destruibles de la Nave Nodriza
+        if (ms.modules) {
+            ms.modules.forEach(m => {
+                if (m.destroyed) return;
+                const mScaleX = (m.offsetX / ms.size) * radius;
+                const mScaleY = (m.offsetY / ms.size) * radius;
+                
+                ctx.save();
+                ctx.translate(mScaleX, mScaleY);
+                
+                ctx.strokeStyle = m.hp > m.maxHp * 0.4 ? '#ff9900' : '#ff0055';
+                ctx.lineWidth = Math.max(2, 4 * scale);
+                ctx.beginPath();
+                ctx.arc(0, 0, radius * 0.2, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                const barW = Math.max(30, 50 * scale);
+                const barH = 4;
+                const hpRatio = Math.max(0, m.hp / m.maxHp);
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(-barW/2, -radius * 0.3, barW, barH);
+                ctx.fillStyle = m.hp > m.maxHp * 0.4 ? '#ff9900' : '#ff0055';
+                ctx.fillRect(-barW/2, -radius * 0.3, barW * hpRatio, barH);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '8px Orbitron';
+                ctx.fillText(m.name, 0, -radius * 0.35);
+                ctx.restore();
+            });
+        }
+        
+        ctx.restore();
+        
+        // Indicador de distancia y salud de la Nave Nodriza
+        const distM = Math.round(rel.z);
+        ctx.fillStyle = '#00f0ff';
+        ctx.font = 'bold 12px Orbitron';
+        ctx.textAlign = 'center';
+        ctx.fillText(`🛸 NAVE NODRIZA DREADNOUGHT [${distM}m]`, screenX, screenY - radius - 25);
+        
+        const mainBarW = Math.max(80, 160 * scale);
+        const mainBarH = 6;
+        const mainHpRatio = Math.max(0, ms.hp / ms.maxHp);
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(screenX - mainBarW/2, screenY - radius - 18, mainBarW, mainBarH);
+        ctx.fillStyle = '#00f0ff';
+        ctx.fillRect(screenX - mainBarW/2, screenY - radius - 18, mainBarW * mainHpRatio, mainBarH);
+        
+        // Comprobar si se puede ATERRIZAR
+        if (distM < 160 && state.currentThrottleVal < 0.4) {
+            state.dockingAvailable = true;
+            state.dockingMothershipId = ms.id;
+            
+            ctx.fillStyle = '#39ff14';
+            ctx.font = 'bold 13px Orbitron';
+            ctx.fillText('🛬 DOCKING LISTO: TOCA BOTÓN O ESPACIO', screenX, screenY + radius + 30);
+        }
     });
 
     // 4.5 Dibujar Planeta Objetivo (si está en rango visual)
@@ -1645,6 +1871,38 @@ function connectWebSocket() {
                     }
                 });
                 state.otherPlayers = incomingPlayers;
+                if (msg.motherships) {
+                    state.motherships = msg.motherships;
+                }
+                updateHud();
+            }
+            
+            else if (msg.type === 'mothershipHit') {
+                playExplosionSound();
+                triggerHaptic('hit');
+            }
+            
+            else if (msg.type === 'moduleDestroyed') {
+                showGameAlert(`💥 ¡MÓDULO DESTRUIDO: ${msg.moduleName}!`);
+                playExplosionSound();
+                triggerHaptic('combo');
+                state.screenShake = 18;
+            }
+            
+            else if (msg.type === 'mothershipDestroyed') {
+                showGameAlert(`💥 ¡NAVE NODRIZA DESTRUIDA! +2500 PTS`);
+                playExplosionSound();
+                triggerHaptic('wave');
+                state.screenShake = 28;
+            }
+            
+            else if (msg.type === 'docked') {
+                showGameAlert(`🛬 ¡ATERRIZAJE EXITOSO! ESCUDOS REPARADOS`);
+                triggerHaptic('wave');
+                state.shield = msg.shield;
+                state.armor = msg.armor;
+                state.landed = true;
+                state.superLaserActive = true;
                 updateHud();
             }
             

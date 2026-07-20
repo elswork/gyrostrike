@@ -78,6 +78,7 @@ server.on('upgrade', (request, socket, head) => {
 const gameState = {
     players: new Map(), // id -> { id, color, yaw, pitch, score, lastActive, throttle }
     drones: [],         // array de drones
+    motherships: [],    // Naves Nodriza Gigantes
     shield: 100,
     armor: 100,
     wave: 1,
@@ -85,12 +86,12 @@ const gameState = {
     killsNeededForNextWave: 8,
     active: false,
     droneIdCounter: 0,
+    mothershipIdCounter: 0,
     planetX: 0,
     planetY: 0,
     planetZ: 3000,
     speed: 0
 };
-
 
 const COLORS = [
     '#00f0ff', // Cyan
@@ -103,14 +104,11 @@ const COLORS = [
 
 let nextColorIndex = 0;
 
-// --- FÍSICA Y SPAWN DE DRONES EN EL SERVIDOR ---
+// --- FÍSICA Y SPAWN DE DRONES Y NAVES NODRIZA EN EL SERVIDOR ---
 
 function spawnDrone() {
-    // --- PARÁMETROS CONFIGURABLES ---
-    const BASE_MAX_DRONES = 2; // Cantidad de naves en oleada 1
-    const MAX_DRONES_LIMIT = 5; // Límite absoluto en oleadas avanzadas
-    
-    // Escalar la cantidad de enemigos permitidos simultáneamente según el nivel de oleada
+    const BASE_MAX_DRONES = 2;
+    const MAX_DRONES_LIMIT = 5;
     const currentMaxDrones = Math.min(MAX_DRONES_LIMIT, BASE_MAX_DRONES + Math.floor((gameState.wave - 1) / 2));
     
     if (!gameState.active || gameState.drones.length >= currentMaxDrones) return;
@@ -128,9 +126,39 @@ function spawnDrone() {
         z: 1800 + Math.random() * 200,
         type: types[Math.floor(Math.random() * types.length)],
         size: 35,
-        // --- PARÁMETROS CONFIGURABLES ---
-        // Oleada 1 tendrá una velocidad de ~3.2m/frame. La dificultad escala un 15% por oleada.
         speed: 2.8 + (gameState.wave * 0.35) + (Math.random() * 0.5)
+    });
+}
+
+function spawnMothership() {
+    if (!gameState.active || gameState.motherships.length >= 1) return;
+    
+    gameState.mothershipIdCounter++;
+    const angle = (Math.random() - 0.5) * Math.PI * 0.4;
+    const shipType = (gameState.mothershipIdCounter % 2 === 1) ? 'enterprise' : 'star_destroyer';
+    
+    gameState.motherships.push({
+        id: gameState.mothershipIdCounter,
+        shipType: shipType,
+        x: Math.sin(angle) * 250,
+        y: (Math.random() - 0.5) * 150,
+        z: 2200,
+        size: 210,
+        hp: 1400,
+        maxHp: 1400,
+        speed: 1.0,
+        modules: [
+            { id: 'gen_left', name: shipType === 'enterprise' ? 'Góndola Warp Izq' : 'Generador Escudo Izq', hp: 300, maxHp: 300, offsetX: -110, offsetY: 0, offsetZ: -20, destroyed: false },
+            { id: 'gen_right', name: shipType === 'enterprise' ? 'Góndola Warp Der' : 'Generador Escudo Der', hp: 300, maxHp: 300, offsetX: 110, offsetY: 0, offsetZ: -20, destroyed: false },
+            { id: 'bridge', name: shipType === 'enterprise' ? 'Puente Saucer (StarTrek)' : 'Torre Mando (StarWars)', hp: 400, maxHp: 400, offsetX: 0, offsetY: 45, offsetZ: 30, destroyed: false },
+            { id: 'engine', name: shipType === 'enterprise' ? 'Núcleo Colector' : 'Reactor Iónico Triple', hp: 400, maxHp: 400, offsetX: 0, offsetY: -40, offsetZ: -70, destroyed: false }
+        ],
+        dockingPad: {
+            offsetX: 0,
+            offsetY: 35,
+            offsetZ: 10,
+            radius: 100
+        }
     });
 }
 
@@ -161,7 +189,6 @@ function broadcast(message) {
 function serverPhysicsLoop() {
     if (!gameState.active) return;
     
-    // 1. Calcular promedio de yaw, pitch y throttle de todos los jugadores
     let totalYaw = 0;
     let totalPitch = 0;
     let totalThrottle = 0;
@@ -178,21 +205,17 @@ function serverPhysicsLoop() {
     const avgPitch = playerCount > 0 ? totalPitch / playerCount : 0;
     const avgThrottle = playerCount > 0 ? totalThrottle / playerCount : 0;
     
-    // Calcular velocidad de la nave (max velocidad = 180 m/s)
     const maxSpeed = 180;
     gameState.speed = avgThrottle * maxSpeed;
     
-    // Calcular el vector de avance en 3D
     const dx = gameState.speed * Math.sin(avgYaw) * Math.cos(avgPitch) * 0.033;
     const dy = gameState.speed * Math.sin(avgPitch) * 0.033;
     const dz = gameState.speed * Math.cos(avgYaw) * Math.cos(avgPitch) * 0.033;
     
-    // Actualizar posición del planeta objetivo (se desplaza al revés que el avance)
     gameState.planetX -= dx;
     gameState.planetY -= dy;
     gameState.planetZ -= dz;
     
-    // Si llegamos al planeta objetivo (distancia 3D <= 400m)
     const planetDist = Math.sqrt(gameState.planetX * gameState.planetX + gameState.planetY * gameState.planetY + gameState.planetZ * gameState.planetZ);
     if (planetDist <= 400) {
         nextWave();
@@ -200,31 +223,46 @@ function serverPhysicsLoop() {
     }
     
     let damaged = false;
-    // Mover drones
+    
+    // Mover Drones
     for (let i = gameState.drones.length - 1; i >= 0; i--) {
         const d = gameState.drones[i];
-        
-        // El dron se mueve hacia el jugador + el efecto de la velocidad de la nave
         d.x -= dx;
         d.y -= dy;
         d.z -= (d.speed + dz / 0.033) * 0.033;
         
-        // Impacto contra la base de los jugadores
         if (d.z <= 20) {
             gameState.drones.splice(i, 1);
             damaged = true;
             
-            // Aplicar daño colectivo
             if (gameState.shield > 0) {
                 gameState.shield = Math.max(0, gameState.shield - 25);
             } else {
                 gameState.armor = Math.max(0, gameState.armor - 20);
                 if (gameState.armor <= 0) {
-                    // Fin del juego colectivo
                     gameState.active = false;
                     broadcast({ type: 'gameover', score: getTeamScore(), wave: gameState.wave });
                     gameState.drones = [];
+                    gameState.motherships = [];
                 }
+            }
+        }
+    }
+    
+    // Mover Naves Nodriza
+    for (let i = gameState.motherships.length - 1; i >= 0; i--) {
+        const ms = gameState.motherships[i];
+        ms.x -= dx;
+        ms.y -= dy;
+        ms.z -= (ms.speed + dz / 0.033) * 0.033;
+        
+        if (ms.z <= 40) {
+            gameState.motherships.splice(i, 1);
+            damaged = true;
+            if (gameState.shield > 0) {
+                gameState.shield = Math.max(0, gameState.shield - 35);
+            } else {
+                gameState.armor = Math.max(0, gameState.armor - 30);
             }
         }
     }
@@ -237,7 +275,6 @@ function serverPhysicsLoop() {
         });
     }
     
-    // Broadcast de estado a todos los jugadores
     const playersList = Array.from(gameState.players.values()).map(p => ({
         id: p.id,
         color: p.color,
@@ -251,6 +288,7 @@ function serverPhysicsLoop() {
         type: 'state',
         players: playersList,
         drones: gameState.drones,
+        motherships: gameState.motherships,
         shield: gameState.shield,
         armor: gameState.armor,
         wave: gameState.wave,
@@ -291,12 +329,15 @@ function nextWave() {
     });
 }
 
-// Spawner periódico (reducido a 5000ms e individual para menor congestión)
+// Spawner periódico de drones y naves nodriza
 setInterval(() => {
     if (gameState.active) {
         spawnDrone();
+        if (gameState.motherships.length === 0 && (gameState.wave >= 2 || Math.random() < 0.6)) {
+            spawnMothership();
+        }
     }
-}, 5000);
+}, 4500);
 
 // Bucle de físicas (33ms = 30fps aprox)
 setInterval(serverPhysicsLoop, 33);
@@ -313,6 +354,7 @@ setInterval(() => {
             if (gameState.players.size === 0) {
                 gameState.active = false;
                 gameState.drones = [];
+                gameState.motherships = [];
             }
         }
     });
@@ -350,11 +392,13 @@ wss.on('connection', (ws) => {
         gameState.wave = 1;
         gameState.killsInWave = 0;
         gameState.drones = [];
+        gameState.motherships = [];
         gameState.planetX = (Math.random() - 0.5) * 1500;
         gameState.planetY = (Math.random() - 0.5) * 800;
         gameState.planetZ = 3000;
         gameState.speed = 0;
         spawnDrone();
+        spawnMothership();
     }
     
     // Enviar bienvenida al jugador
@@ -383,6 +427,20 @@ wss.on('connection', (ws) => {
             else if (msg.type === 'throttle') {
                 playerState.throttle = msg.value;
             }
+
+            else if (msg.type === 'dock') {
+                // El jugador solicita aterrizar en la plataforma de la Nave Nodriza
+                gameState.shield = Math.min(100, gameState.shield + 40);
+                gameState.armor = Math.min(100, gameState.armor + 30);
+                playerState.score += 500;
+                
+                broadcast({
+                    type: 'docked',
+                    playerId: myId,
+                    shield: gameState.shield,
+                    armor: gameState.armor
+                });
+            }
             
             else if (msg.type === 'shoot') {
                 // Re-difundir disparo para pintar rayo láser en los demás clientes
@@ -393,7 +451,92 @@ wss.on('connection', (ws) => {
                     pitch: msg.pitch
                 });
                 
-                // Comprobar colisión en el servidor
+                // 1. Comprobar colisión con Módulos de Nave Nodriza
+                let msHit = false;
+                for (let i = gameState.motherships.length - 1; i >= 0; i--) {
+                    const ms = gameState.motherships[i];
+                    
+                    for (let m of ms.modules) {
+                        if (m.destroyed) continue;
+                        const modPos = {
+                            x: ms.x + m.offsetX,
+                            y: ms.y + m.offsetY,
+                            z: ms.z + m.offsetZ
+                        };
+                        const relMod = getRelativeCoordinates(modPos, msg.yaw, msg.pitch);
+                        
+                        if (relMod.z > 20 && Math.hypot(relMod.x, relMod.y) < 55) {
+                            m.hp -= 90;
+                            msHit = true;
+                            playerState.score += 200;
+                            
+                            if (m.hp <= 0) {
+                                m.destroyed = true;
+                                m.hp = 0;
+                                playerState.score += 600;
+                                broadcast({
+                                    type: 'moduleDestroyed',
+                                    mothershipId: ms.id,
+                                    moduleId: m.id,
+                                    moduleName: m.name,
+                                    x: modPos.x,
+                                    y: modPos.y,
+                                    z: modPos.z
+                                });
+                            } else {
+                                broadcast({
+                                    type: 'mothershipHit',
+                                    mothershipId: ms.id,
+                                    moduleId: m.id,
+                                    hp: m.hp,
+                                    maxHp: m.maxHp,
+                                    x: modPos.x,
+                                    y: modPos.y,
+                                    z: modPos.z
+                                });
+                            }
+                            break;
+                        }
+                    }
+                    
+                    if (msHit) break;
+                    
+                    // Colisión con casco principal de Nave Nodriza
+                    const relMs = getRelativeCoordinates(ms, msg.yaw, msg.pitch);
+                    if (relMs.z > 20 && Math.hypot(relMs.x, relMs.y) < ms.size * 1.3) {
+                        ms.hp -= 75;
+                        msHit = true;
+                        playerState.score += 150;
+                        
+                        if (ms.hp <= 0) {
+                            playerState.score += 2500;
+                            gameState.killsInWave += 3;
+                            broadcast({
+                                type: 'mothershipDestroyed',
+                                mothershipId: ms.id,
+                                x: ms.x,
+                                y: ms.y,
+                                z: ms.z
+                            });
+                            gameState.motherships.splice(i, 1);
+                        } else {
+                            broadcast({
+                                type: 'mothershipHit',
+                                mothershipId: ms.id,
+                                hp: ms.hp,
+                                maxHp: ms.maxHp,
+                                x: ms.x,
+                                y: ms.y,
+                                z: ms.z
+                            });
+                        }
+                        break;
+                    }
+                }
+                
+                if (msHit) return;
+
+                // 2. Comprobar colisión con Drones Estándar
                 let hitIndex = -1;
                 for (let i = gameState.drones.length - 1; i >= 0; i--) {
                     const drone = gameState.drones[i];
@@ -401,7 +544,6 @@ wss.on('connection', (ws) => {
                     
                     if (rel.z <= 20) continue;
                     
-                    // Colisión simplificada: si la distancia transversal es menor al radio del dron
                     if (Math.hypot(rel.x, rel.y) < drone.size * 1.5) {
                         hitIndex = i;
                         break;
@@ -442,6 +584,7 @@ wss.on('connection', (ws) => {
         if (gameState.players.size === 0) {
             gameState.active = false;
             gameState.drones = [];
+            gameState.motherships = [];
         }
     });
 });
