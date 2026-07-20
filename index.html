@@ -20,7 +20,52 @@
             <h1 class="glow-text">GYRO<span>STRIKE</span></h1>
             <p class="subtitle">NEON SECTOR</p>
             
-            <div class="instructions">
+            <!-- Selector de Modo de Control (PC / Móvil) -->
+            <div class="control-mode-selector">
+                <button id="tab-pc" class="tab-btn active">💻 PC (TECLADO + RATÓN)</button>
+                <button id="tab-mobile" class="tab-btn">📱 MÓVIL (GIROSCOPIO)</button>
+            </div>
+
+            <div id="instructions-pc" class="instructions-panel">
+                <div class="controls-grid">
+                    <div class="control-item">
+                        <div class="badge-group">
+                            <span class="key-badge">RATÓN</span>
+                        </div>
+                        <span class="control-desc">Apuntar la mira de combate (360°)</span>
+                    </div>
+                    <div class="control-item">
+                        <div class="badge-group">
+                            <span class="key-badge">CLIC</span>
+                            <span class="key-badge">ESPACIO</span>
+                        </div>
+                        <span class="control-desc">Disparar cañones láser</span>
+                    </div>
+                    <div class="control-item">
+                        <div class="badge-group">
+                            <span class="key-badge">W</span>
+                            <span class="key-badge">S</span>
+                        </div>
+                        <span class="control-desc">Aumentar / Reducir Acelerador (Thrust)</span>
+                    </div>
+                    <div class="control-item">
+                        <div class="badge-group">
+                            <span class="key-badge">C</span>
+                            <span class="key-badge">L</span>
+                        </div>
+                        <span class="control-desc">Recalibrar (C) / Bloquear Ratón 360° (L)</span>
+                    </div>
+                </div>
+                <div class="pc-options">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="chk-pointer-lock" checked>
+                        <span class="checkmark"></span>
+                        Captura de Ratón 360° (Pointer Lock FPS Mode)
+                    </label>
+                </div>
+            </div>
+
+            <div id="instructions-mobile" class="instructions-panel hidden">
                 <p>Usa tu teléfono como un arma espacial. Gira sobre ti mismo para apuntar a los drones invasores y toca la pantalla para disparar.</p>
                 <div class="connection-tip">
                     <span class="pulse-icon">📡</span>
@@ -36,11 +81,11 @@
             </div>
             
             <div id="status-message" class="status-msg">
-                Detectando sensores...
+                Listo para el combate en PC.
             </div>
             
             <div id="sensor-fallback-info" class="fallback-info hidden">
-                ⚠️ Giroscopio no disponible. Se activará el modo táctil (arrastra para apuntar).
+                ⚠️ Modo PC activado (Teclado + Ratón).
             </div>
 
             <!-- Enlace al repositorio Git -->
@@ -90,6 +135,15 @@
                 </div>
             </div>
 
+            <!-- Guía de Teclas para PC (HUD central inferior) -->
+            <div id="hud-pc-controls" class="hud-pc-bar hidden">
+                <span class="pc-hint"><span class="key-badge-sm">RATÓN</span> Apuntar</span>
+                <span class="pc-hint"><span class="key-badge-sm">CLIC / ESPACIO</span> Disparar</span>
+                <span class="pc-hint"><span class="key-badge-sm">W / S</span> Acelerador</span>
+                <span class="pc-hint"><span class="key-badge-sm">C</span> Recalibrar</span>
+                <span class="pc-hint"><span class="key-badge-sm">L</span> Lock Ratón</span>
+            </div>
+
             <!-- Temperatura del Arma -->
             <div class="hud-bar-group right-align">
                 <div class="hud-bar-container heat-container">
@@ -99,9 +153,11 @@
                     </div>
                     <span id="overheat-warning" class="overheat-text hidden">OVERHEAT</span>
                 </div>
-                <!-- Botón de calibración rápida en juego -->
-                <button id="btn-game-calibrate" class="btn-icon" title="Recalibrar giroscopio">🎯</button>
-                <button id="btn-game-fullscreen" class="btn-icon" title="Pantalla completa">📺</button>
+                <div class="hud-actions-row">
+                    <button id="btn-game-calibrate" class="btn-icon" title="Recalibrar giroscopio/vista (C)">🎯</button>
+                    <button id="btn-toggle-pointerlock" class="btn-icon" title="Bloquear/Liberar Ratón 360° (L)">🖱️</button>
+                    <button id="btn-game-fullscreen" class="btn-icon" title="Pantalla completa">📺</button>
+                </div>
             </div>
         </div>
 

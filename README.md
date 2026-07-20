@@ -10,11 +10,11 @@
 
 ## 🚀 Características Principales
 
+- 💻 **Soporte Completo para PC (Teclado + Ratón)**: Jugable directamente desde ordenadores con apuntado por movimiento libre de ratón o captura Pointer Lock 360° estilo FPS, acelerador con `W/S` y disparo con `Clic/Espacio`.
 - 📱 **Control por Movimiento Real**: Utiliza la API de giroscopio (`DeviceOrientation`) de tu dispositivo móvil para apuntar girando físicamente sobre ti mismo.
-- 💻 **Modo Fallback Táctil**: Detección automática en dispositivos sin giroscopio o sin permisos, permitiendo apuntar deslizando el dedo por la pantalla.
-- 🔄 **Sincronización Multijugador**: Basado en WebSockets en tiempo real (`ws`), lo que permite que múltiples jugadores compartan el mismo espacio de combate y cooperen para sobrevivir.
+- 🔄 **Sincronización Multijugador**: Basado en WebSockets en tiempo real (`ws`), lo que permite que múltiples jugadores (PC y móviles) compartan el mismo espacio de combate y cooperen para sobrevivir.
 - 🛡️ **Estado Cooperativo**: Vida (Armor) y Escudos (Shield) compartidos. ¡Si la base cae, todos pierden!
-- 🎨 **Estética Cyberpunk/Neón**: Interfaz de diagnóstico de sensores, efectos visuales de partículas dinámicas y un HUD de estilo retro-futurista adaptativo.
+- 🎨 **Estética Cyberpunk/Neón**: Selector interactivo de controles, interfaz de diagnóstico de sensores, efectos visuales de partículas dinámicas y un HUD de estilo retro-futurista adaptativo.
 
 ---
 
@@ -105,18 +105,22 @@ La forma más rápida y limpia de ejecutar el juego sin preocuparse de los puert
 
 ## 🎮 Cómo Jugar
 
-1. **Montar la Sala**: Abre el juego en una pantalla principal grande (como tu ordenador de sobremesa, portátil o Smart TV conectada) accediendo a `http://<IP_LOCAL_DE_TU_PC>:8088`.
-2. **Conectar Mandos**: Desde tu móvil, conéctate a la **misma red WiFi** que el ordenador principal y abre el navegador web apuntando a la IP local de tu servidor (ej. `http://192.168.1.50:8088`).
-3. **Calibrar**:
-   - Sujeta tu móvil en posición vertical mirando hacia la pantalla principal.
-   - Presiona **"INICIAR COMBATE"**. 
-   - Si es necesario, concede permisos de sensores (en iOS/Safari se te solicitará permiso explícito de orientación).
-   - Puedes presionar el botón de **Calibración** o el icono `🎯` en cualquier momento para restablecer tu punto central (mirada hacia el frente).
-4. **Combate**:
-   - **Gira sobre ti mismo** a la izquierda, derecha, arriba o abajo para apuntar con tu retícula de color.
-   - **Toca la pantalla de tu móvil** para disparar ráfagas de láseres de neón.
-   - *Cuidado con el calentamiento*: Si disparas demasiado rápido, tu arma sufrirá de **Overheat** y tendrás que esperar a que se enfríe.
-   - **Modo Táctil**: Si no dispones de giroscopio en tu dispositivo, arrastra el dedo por la pantalla para mover la retícula.
+### 💻 En PC (Teclado + Ratón):
+1. **Accede al juego**: Abre `http://localhost:8088` (o la dirección del servidor).
+2. **Selecciona el Modo PC**: El sistema detectará automáticamente tu ordenador y activará el modo PC.
+3. **Controles**:
+   - 🖱️ **Apuntado (Ratón)**: Mueve el ratón para apuntar tu retícula. Puedes activar la **Captura de Ratón 360° (Pointer Lock)** mediante la casilla inicial o la tecla `L`.
+   - 💥 **Disparo**: Haz Clic Izquierdo, pulsa `ESPACIO` o la tecla `E`.
+   - 🚀 **Acelerador (Thrust)**: Pulsa `W` (Aumentar) o `S` (Reducir) para controlar la velocidad de viaje hacia el planeta.
+   - 🎯 **Recalibrar / Centrar**: Pulsa la tecla `C` o `R` en cualquier momento.
+
+### 📱 En Móvil (Giroscopio / Táctil):
+1. **Conectar**: Conéctate a la misma red WiFi que el servidor y abre la dirección en el navegador móvil.
+2. **Iniciar & Calibrar**: Sujeta tu teléfono mirando hacia el frente y pulsa **"INICIAR COMBATE"**.
+3. **Controles**:
+   - **Gira sobre ti mismo** a la izquierda, derecha, arriba o abajo para apuntar con tu giroscopio.
+   - **Toca la pantalla** para disparar.
+   - Si no dispones de giroscopio, puedes arrastrar el dedo por la pantalla (modo táctil).
 
 ---
 

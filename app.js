@@ -60,7 +60,25 @@ const state = {
     sensorEventsReceived: false,
     lastTouch: { x: 0, y: 0 },
     isDragging: false,
-    screenRotated: false // true si está en landscape
+    screenRotated: false, // true si está en landscape
+    // Estado de PC y Controles
+    isPC: false,
+    controlMode: 'mouse', // 'mouse', 'pointerlock', 'keyboard', 'gyro', 'touch'
+    usePointerLock: true,
+    pointerLocked: false,
+    keys: {
+        w: false,
+        s: false,
+        a: false,
+        d: false,
+        space: false,
+        arrowUp: false,
+        arrowDown: false,
+        arrowLeft: false,
+        arrowRight: false
+    },
+    mousePos: { x: 0, y: 0 },
+    currentThrottleVal: 0
 };
 
 // --- AUDIO SINTETIZADO (Web Audio API) ---
@@ -362,13 +380,158 @@ function setupSensorListeners() {
 
 function showSensorFallback(customMessage) {
     state.useGyro = false;
-    document.getElementById('status-message').textContent = customMessage || "Giroscopio no disponible.";
-    document.getElementById('sensor-fallback-info').classList.remove('hidden');
-    
-    const dbgApi = document.getElementById('dbg-api');
-    if (dbgApi) {
-        dbgApi.textContent = "INACTIVO (TÁCTIL)";
-        dbgApi.style.color = "var(--neon-pink)";
+    if (state.isPC) {
+        document.getElementById('status-message').textContent = "Modo PC activo (Teclado + Ratón).";
+        const dbgApi = document.getElementById('dbg-api');
+        if (dbgApi) {
+            dbgApi.textContent = state.pointerLocked ? "PC (POINTER LOCK 360°)" : "PC (RATÓN LIBRE)";
+            dbgApi.style.color = "var(--neon-cyan)";
+        }
+    } else {
+        document.getElementById('status-message').textContent = customMessage || "Giroscopio no disponible.";
+        document.getElementById('sensor-fallback-info').classList.remove('hidden');
+        
+        const dbgApi = document.getElementById('dbg-api');
+        if (dbgApi) {
+            dbgApi.textContent = "INACTIVO (TÁCTIL)";
+            dbgApi.style.color = "var(--neon-pink)";
+        }
+    }
+}
+
+// --- MANEJO DE CONTROLES PC (TECLADO + RATÓN) ---
+
+function setupPCControls() {
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    state.isPC = !isTouch;
+
+    const tabPc = document.getElementById('tab-pc');
+    const tabMobile = document.getElementById('tab-mobile');
+    const instPc = document.getElementById('instructions-pc');
+    const instMobile = document.getElementById('instructions-mobile');
+    const chkPointerLock = document.getElementById('chk-pointer-lock');
+
+    if (chkPointerLock) {
+        state.usePointerLock = chkPointerLock.checked;
+        chkPointerLock.addEventListener('change', (e) => {
+            state.usePointerLock = e.target.checked;
+            if (!state.usePointerLock && state.pointerLocked) {
+                document.exitPointerLock();
+            }
+        });
+    }
+
+    if (tabPc && tabMobile) {
+        tabPc.addEventListener('click', () => {
+            tabPc.classList.add('active');
+            tabMobile.classList.remove('active');
+            if (instPc) instPc.classList.remove('hidden');
+            if (instMobile) instMobile.classList.add('hidden');
+            state.controlMode = state.usePointerLock ? 'pointerlock' : 'mouse';
+            document.getElementById('status-message').textContent = "Modo PC activo (Teclado + Ratón).";
+        });
+
+        tabMobile.addEventListener('click', () => {
+            tabMobile.classList.add('active');
+            tabPc.classList.remove('active');
+            if (instMobile) instMobile.classList.remove('hidden');
+            if (instPc) instPc.classList.add('hidden');
+            state.controlMode = 'gyro';
+            document.getElementById('status-message').textContent = "Modo Móvil seleccionado.";
+        });
+    }
+
+    if (state.isPC) {
+        state.controlMode = 'mouse';
+        if (tabPc) tabPc.click();
+    } else {
+        state.controlMode = 'gyro';
+        if (tabMobile) tabMobile.click();
+    }
+
+    // Eventos de Teclado
+    window.addEventListener('keydown', (e) => {
+        if (!state.playing) return;
+
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') state.keys.w = true;
+        if (e.code === 'KeyS' || e.code === 'ArrowDown') state.keys.s = true;
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') state.keys.a = true;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') state.keys.d = true;
+
+        if (e.code === 'Space' || e.code === 'KeyE') {
+            e.preventDefault();
+            shoot(canvas.width / 2, canvas.height / 2);
+        }
+
+        if (e.code === 'KeyC' || e.code === 'KeyR') {
+            calibrateSensors();
+            state.camYaw = 0;
+            state.camPitch = 0;
+        }
+
+        if (e.code === 'KeyL') {
+            togglePointerLock();
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') state.keys.w = false;
+        if (e.code === 'KeyS' || e.code === 'ArrowDown') state.keys.s = false;
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') state.keys.a = false;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') state.keys.d = false;
+    });
+
+    // Movimiento de Ratón (Mouse Aim & Pointer Lock)
+    window.addEventListener('mousemove', (e) => {
+        if (!state.playing) return;
+
+        state.mousePos.x = e.clientX;
+        state.mousePos.y = e.clientY;
+
+        if (state.pointerLocked && document.pointerLockElement === canvas) {
+            const sensitivity = 0.0024;
+            state.camYaw -= e.movementX * sensitivity;
+            state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch + e.movementY * sensitivity));
+        } else if (state.isPC && !state.useGyro && !state.isDragging) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const normX = (e.clientX - centerX) / centerX;
+            const normY = (e.clientY - centerY) / centerY;
+
+            const targetYaw = -normX * (Math.PI / 2.2);
+            const targetPitch = -normY * (Math.PI / 3.2);
+
+            state.camYaw += (targetYaw - state.camYaw) * 0.15;
+            state.camPitch += (targetPitch - state.camPitch) * 0.15;
+        }
+    });
+
+    // Listener para eventos Pointer Lock API
+    document.addEventListener('pointerlockchange', () => {
+        state.pointerLocked = (document.pointerLockElement === canvas);
+        const btnLock = document.getElementById('btn-toggle-pointerlock');
+        if (btnLock) {
+            btnLock.textContent = state.pointerLocked ? '🔒' : '🖱️';
+            btnLock.style.borderColor = state.pointerLocked ? 'var(--neon-green)' : 'var(--hud-border)';
+        }
+
+        const dbgApi = document.getElementById('dbg-api');
+        if (dbgApi && state.isPC) {
+            dbgApi.textContent = state.pointerLocked ? "PC (POINTER LOCK 360°)" : "PC (RATÓN LIBRE)";
+            dbgApi.style.color = "var(--neon-cyan)";
+        }
+
+        if (state.pointerLocked) {
+            showGameAlert("🔒 RATÓN CAPTURADO (ESC PARA LIBERAR)");
+        }
+    });
+}
+
+function togglePointerLock() {
+    if (!document.pointerLockElement) {
+        canvas.requestPointerLock();
+    } else {
+        document.exitPointerLock();
     }
 }
 
@@ -533,11 +696,17 @@ function shoot(clientX, clientY) {
     }
 }
 
-// Control táctil para simular giroscopio en escritorio o si falla el sensor
+// Control táctil o de ratón para disparar y mover cámara
 canvas.addEventListener('pointerdown', (e) => {
     if (!state.playing) return;
     
-    if (!state.useGyro) {
+    if (state.isPC && state.usePointerLock && !state.pointerLocked) {
+        try {
+            canvas.requestPointerLock();
+        } catch(err) {}
+    }
+    
+    if (!state.useGyro && !state.isPC) {
         state.isDragging = true;
         state.lastTouch.x = e.clientX;
         state.lastTouch.y = e.clientY;
@@ -589,6 +758,24 @@ function update() {
     // Reducir la sacudida de pantalla gradualmente
     if (state.screenShake > 0) {
         state.screenShake = Math.max(0, state.screenShake - 0.7);
+    }
+
+    // --- CONTROLES CONTINUOS DE TECLADO (PC) ---
+    if (state.keys.w || state.keys.arrowUp) {
+        state.currentThrottleVal = Math.min(1.0, state.currentThrottleVal + 0.02);
+        updateThrottleUI(state.currentThrottleVal);
+        sendThrottleToServer(state.currentThrottleVal);
+    } else if (state.keys.s || state.keys.arrowDown) {
+        state.currentThrottleVal = Math.max(0.0, state.currentThrottleVal - 0.02);
+        updateThrottleUI(state.currentThrottleVal);
+        sendThrottleToServer(state.currentThrottleVal);
+    }
+
+    if (state.keys.a || state.keys.arrowLeft) {
+        state.camYaw += 0.025;
+    }
+    if (state.keys.d || state.keys.arrowRight) {
+        state.camYaw -= 0.025;
     }
 
     // 1. Enfriamiento del arma
@@ -1501,22 +1688,26 @@ function connectWebSocket() {
 // --- BINDINGS DE EVENTOS DOM ---
 
 document.getElementById('btn-start').addEventListener('click', async () => {
-    // Inicializar audio y solicitar permisos del giroscopio
     initAudio();
-    
-    // Conectar al WebSocket multijugador antes de iniciar
     connectWebSocket();
     
-    const hasGyro = await requestSensorPermissions();
-    
-    if (hasGyro) {
-        // Breve retraso para asegurar calibración correcta tras activar sensores
-        setTimeout(() => {
-            calibrateSensors();
-            initGame();
-        }, 300);
-    } else {
+    if (state.isPC) {
         initGame();
+        if (state.usePointerLock) {
+            try {
+                canvas.requestPointerLock();
+            } catch(err) {}
+        }
+    } else {
+        const hasGyro = await requestSensorPermissions();
+        if (hasGyro) {
+            setTimeout(() => {
+                calibrateSensors();
+                initGame();
+            }, 300);
+        } else {
+            initGame();
+        }
     }
 });
 
@@ -1525,16 +1716,17 @@ document.getElementById('btn-calibrate').addEventListener('click', () => {
 });
 
 document.getElementById('btn-game-calibrate').addEventListener('click', (e) => {
-    e.stopPropagation(); // Evita disparar al hacer clic en el botón de calibración
+    e.stopPropagation();
     calibrateSensors();
 });
 
-// Calibración por teclado (barra espaciadora o tecla C) en escritorio
-window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'KeyC') {
-        calibrateSensors();
-    }
-});
+const btnToggleLock = document.getElementById('btn-toggle-pointerlock');
+if (btnToggleLock) {
+    btnToggleLock.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePointerLock();
+    });
+}
 
 // Pantalla completa (Fullscreen API)
 function toggleFullscreen() {
@@ -1565,23 +1757,19 @@ if (btnGameFullscreen) {
     });
 }
 
-
 // Inicializar el fondo espacial de pantalla de título al cargar
 initStars();
 function drawMenuBackground() {
     if (state.playing) return;
     
-    // Si no está jugando, simular giroscopio flotante de menú
     state.camYaw = Math.sin(Date.now() * 0.0005) * 0.15;
     state.camPitch = Math.cos(Date.now() * 0.0007) * 0.1;
     
     ctx.fillStyle = '#03030d';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Estrellas
     ctx.fillStyle = '#ffffff';
     state.stars.forEach(star => {
-        // En menú, vuelan rápido hacia adelante
         star.z -= 1.5;
         if (star.z <= 0) star.z = 2000;
         
@@ -1600,23 +1788,35 @@ function drawMenuBackground() {
         }
     });
     
-    // Dibujar cuadrícula tenue
     drawSpatialGrid();
     
     requestAnimationFrame(drawMenuBackground);
 }
 drawMenuBackground();
 
-// --- MANEJO DE CONTROLES TÁCTILES MÓVILES ---
+// Inicializar controles de PC y detección al arrancar
+setupPCControls();
+
+// --- MANEJO DE CONTROLES TÁCTILES MÓVILES Y BARRA PC ---
 function updateMobileControlsVisibility() {
     const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     const controls = document.getElementById('mobile-controls');
-    if (!controls) return;
+    const pcControls = document.getElementById('hud-pc-controls');
     
-    if (isTouch && state.screenRotated && state.playing) {
-        controls.classList.remove('hidden');
-    } else {
-        controls.classList.add('hidden');
+    if (controls) {
+        if (isTouch && state.screenRotated && state.playing) {
+            controls.classList.remove('hidden');
+        } else {
+            controls.classList.add('hidden');
+        }
+    }
+    
+    if (pcControls) {
+        if (state.isPC && state.playing) {
+            pcControls.classList.remove('hidden');
+        } else {
+            pcControls.classList.add('hidden');
+        }
     }
 }
 
