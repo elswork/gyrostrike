@@ -82,6 +82,41 @@ const state = {
     currentThrottleVal: 0
 };
 
+// --- SISTEMA DE FEEDBACK HÁPTICO (VIBRACIÓN MÓVIL) ---
+function triggerHaptic(type) {
+    if (!('vibrate' in navigator)) return;
+    try {
+        switch (type) {
+            case 'shoot':
+                // Pulso sutil al disparar láser
+                navigator.vibrate(25);
+                break;
+            case 'hit':
+                // Impacto táctil nítido al derribar / golpear un objetivo (doble toque corto)
+                navigator.vibrate([45, 30, 45]);
+                break;
+            case 'combo':
+                // Ráfaga física ascendente al aumentar multiplicador o combo
+                navigator.vibrate([30, 30, 40, 30, 80]);
+                break;
+            case 'damage':
+                // Impacto pesado rítmico al recibir daño
+                navigator.vibrate([120, 50, 120, 50, 150]);
+                break;
+            case 'wave':
+                // Celebración física al pasar de oleada
+                navigator.vibrate([80, 40, 80, 40, 120]);
+                break;
+            case 'overheat':
+                // Advertencia táctil por cañón sobrecalentado
+                navigator.vibrate([70, 40, 70]);
+                break;
+        }
+    } catch (e) {
+        // Ignorar en plataformas sin soporte de vibración
+    }
+}
+
 // --- AUDIO SINTETIZADO (Web Audio API) ---
 let audioCtx = null;
 
@@ -479,10 +514,19 @@ function setupPCControls() {
 
         if (!state.playing) return;
 
-        if (e.code === 'KeyW' || e.code === 'ArrowUp') state.keys.w = true;
-        if (e.code === 'KeyS' || e.code === 'ArrowDown') state.keys.s = true;
-        if (e.code === 'KeyA' || e.code === 'ArrowLeft') state.keys.a = true;
-        if (e.code === 'KeyD' || e.code === 'ArrowRight') state.keys.d = true;
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+            e.preventDefault();
+        }
+
+        if (e.code === 'KeyW') state.keys.w = true;
+        if (e.code === 'KeyS') state.keys.s = true;
+        if (e.code === 'KeyA') state.keys.a = true;
+        if (e.code === 'KeyD') state.keys.d = true;
+
+        if (e.code === 'ArrowUp') state.keys.arrowUp = true;
+        if (e.code === 'ArrowDown') state.keys.arrowDown = true;
+        if (e.code === 'ArrowLeft') state.keys.arrowLeft = true;
+        if (e.code === 'ArrowRight') state.keys.arrowRight = true;
 
         if (e.code === 'Space' || e.code === 'KeyE') {
             e.preventDefault();
@@ -501,10 +545,15 @@ function setupPCControls() {
     });
 
     window.addEventListener('keyup', (e) => {
-        if (e.code === 'KeyW' || e.code === 'ArrowUp') state.keys.w = false;
-        if (e.code === 'KeyS' || e.code === 'ArrowDown') state.keys.s = false;
-        if (e.code === 'KeyA' || e.code === 'ArrowLeft') state.keys.a = false;
-        if (e.code === 'KeyD' || e.code === 'ArrowRight') state.keys.d = false;
+        if (e.code === 'KeyW') state.keys.w = false;
+        if (e.code === 'KeyS') state.keys.s = false;
+        if (e.code === 'KeyA') state.keys.a = false;
+        if (e.code === 'KeyD') state.keys.d = false;
+
+        if (e.code === 'ArrowUp') state.keys.arrowUp = false;
+        if (e.code === 'ArrowDown') state.keys.arrowDown = false;
+        if (e.code === 'ArrowLeft') state.keys.arrowLeft = false;
+        if (e.code === 'ArrowRight') state.keys.arrowRight = false;
     });
 
     // Movimiento de Ratón (Mouse Aim & Pointer Lock)
@@ -660,7 +709,7 @@ function updateCameraFromSensors() {
 
     // Filtrar pequeñas variaciones estáticas
     let targetYaw = -yaw * SENSITIVITY;
-    let targetPitch = pitch * SENSITIVITY;
+    let targetPitch = -pitch * SENSITIVITY;
     
     if (Math.abs(yaw) < DEADZONE) targetYaw = 0;
     if (Math.abs(pitch) < DEADZONE) targetPitch = 0;
@@ -704,9 +753,7 @@ function shoot(clientX, clientY) {
     
     // Efecto de audio y vibración
     playShootSound();
-    if (navigator.vibrate) {
-        navigator.vibrate(80); // Vibrar 80ms
-    }
+    triggerHaptic('shoot');
     
     // Incrementar calor del arma
     state.weaponHeat = Math.min(100, state.weaponHeat + CONFIG.shootHeatRate);
@@ -714,6 +761,7 @@ function shoot(clientX, clientY) {
         state.overheated = true;
         document.getElementById('overheat-warning').classList.remove('hidden');
         playOverheatWarning();
+        triggerHaptic('overheat');
     }
     
     // Enviar disparo al servidor WebSocket (el servidor decidirá la colisión)
@@ -752,7 +800,7 @@ canvas.addEventListener('pointermove', (e) => {
         
         // Mover la cámara según el arrastre
         state.camYaw -= dx * 0.005;
-        state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch + dy * 0.005));
+        state.camPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, state.camPitch - dy * 0.005));
         
         state.lastTouch.x = e.clientX;
         state.lastTouch.y = e.clientY;
@@ -791,11 +839,12 @@ function update() {
     }
 
     // --- CONTROLES CONTINUOS DE TECLADO (PC) ---
-    if (state.keys.w || state.keys.arrowUp) {
+    // WASD: Acelerador (W/S)
+    if (state.keys.w) {
         state.currentThrottleVal = Math.min(1.0, state.currentThrottleVal + 0.02);
         updateThrottleUI(state.currentThrottleVal);
         sendThrottleToServer(state.currentThrottleVal);
-    } else if (state.keys.s || state.keys.arrowDown) {
+    } else if (state.keys.s) {
         state.currentThrottleVal = Math.max(0.0, state.currentThrottleVal - 0.02);
         updateThrottleUI(state.currentThrottleVal);
         sendThrottleToServer(state.currentThrottleVal);
@@ -807,6 +856,15 @@ function update() {
     }
     if (state.keys.d || state.keys.arrowRight) {
         state.camYaw -= 0.025 * invertMult;
+    }
+
+    // Flechas arriba/abajo: Control de Subir y Bajar (Inclinación Pitch)
+    const pitchSpeed = 0.025;
+    if (state.keys.arrowUp) {
+        state.camPitch = Math.max(-Math.PI / 3, state.camPitch - pitchSpeed);
+    }
+    if (state.keys.arrowDown) {
+        state.camPitch = Math.min(Math.PI / 3, state.camPitch + pitchSpeed);
     }
 
     // 1. Enfriamiento del arma
@@ -887,9 +945,7 @@ function update() {
 }
 
 function takeDamage() {
-    if (navigator.vibrate) {
-        navigator.vibrate([100, 50, 100]); // Patrón de vibración de daño
-    }
+    triggerHaptic('damage');
     
     // Animación de flash de pantalla rojo
     canvasFlashRed();
@@ -1419,9 +1475,7 @@ function initGame() {
 }
 
 function takeDamageEffects() {
-    if (navigator.vibrate) {
-        navigator.vibrate([100, 50, 100]); // Patrón de vibración de daño
-    }
+    triggerHaptic('damage');
     canvasFlashRed();
     state.multiplier = 1; // Reset multiplicador
     if (audioCtx) playDamageSound();
@@ -1627,11 +1681,6 @@ function connectWebSocket() {
             else if (msg.type === 'hit') {
                 playExplosionSound();
                 
-                // Vibración corta táctil al derribar nave
-                if (navigator.vibrate) {
-                    navigator.vibrate(40);
-                }
-                
                 const pCount = 15;
                 const pData = state.otherPlayers.get(msg.playerId);
                 const color = (msg.playerId === state.myId) ? state.myColor : (pData ? pData.color : '#ff007f');
@@ -1655,7 +1704,15 @@ function connectWebSocket() {
                 }
                 
                 if (msg.playerId === state.myId) {
+                    const prevMult = state.multiplier;
                     state.multiplier = Math.min(5, state.multiplier + 1);
+                    if (state.multiplier > prevMult && state.multiplier > 1) {
+                        triggerHaptic('combo');
+                    } else {
+                        triggerHaptic('hit');
+                    }
+                } else {
+                    triggerHaptic('hit');
                 }
             }
             
@@ -1668,11 +1725,6 @@ function connectWebSocket() {
                 
                 // Velo rojo de impacto
                 takeDamageEffects();
-                
-                // API Háptica móvil (Vibrar 120ms)
-                if (navigator.vibrate) {
-                    navigator.vibrate(120);
-                }
             }
             
             else if (msg.type === 'waveStart') {
@@ -1690,6 +1742,7 @@ function connectWebSocket() {
                 updateThrottleUI(0); // Resetear acelerador visual a cero al pasar de pantalla
                 showGameAlert(`OLEADA COOPERATIVA ${state.wave}`);
                 playNewWaveSound();
+                triggerHaptic('wave');
                 updateHud();
             }
             

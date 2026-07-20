@@ -112,6 +112,8 @@ La forma más rápida y limpia de ejecutar el juego sin preocuparse de los puert
    - 🖱️ **Apuntado (Ratón)**: Mueve el ratón para apuntar tu retícula. Puedes activar la **Captura de Ratón 360° (Pointer Lock)** mediante la casilla inicial o la tecla `L`.
    - 💥 **Disparo**: Haz Clic Izquierdo, pulsa `ESPACIO` o la tecla `E`.
    - 🚀 **Acelerador (Thrust)**: Pulsa `W` (Aumentar) o `S` (Reducir) para controlar la velocidad de viaje hacia el planeta.
+   - ⬆️⬇️ **Subir / Bajar (Pitch)**: Utiliza `Flecha Arriba` o `Flecha Abajo` para inclinar la nave verticalmente.
+   - ⬅️➡️ **Girar (Yaw)**: `A` / `D` o `Flecha Izquierda` / `Flecha Derecha`.
    - 🎯 **Recalibrar / Centrar**: Pulsa la tecla `C` o `R` en cualquier momento.
 
 ### 📱 En Móvil (Giroscopio / Táctil):
